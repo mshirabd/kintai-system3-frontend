@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>出勤簿 - 勤怠管理</title>
+  <link rel="stylesheet" href="../css/common.css">
+  <style>
+    .book-table th, .book-table td { font-size: 12px; padding: 4px 6px; text-align: center; }
+    .book-table .sun { color: #EA4335; }
+    .book-table .sat { color: #1A73E8; }
+  </style>
+</head>
+<body>
+  <div id="nav-container"></div>
+  <div class="container">
+    <h1 style="font-size:20px;margin-bottom:16px;">出勤簿</h1>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <select id="empSelect" class="form-control" style="max-width:200px;">
+        <option value="">従業員を選択</option>
+      </select>
+      <input type="month" id="bookYM" class="form-control" style="max-width:180px;">
+      <button class="btn btn-sm btn-primary" onclick="loadBook()">表示</button>
+      <button class="btn btn-sm btn-success" onclick="exportPdf()">PDF出力</button>
+    </div>
+    <div class="card">
+      <div id="bookData"><div style="color:#999;padding:12px;">従業員と年月を選択してください</div></div>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    if (!auth.requireAdmin()) throw '';
+    renderNav('book');
+
+    document.getElementById('bookYM').value = thisMonthStr();
+
+    async function init() {
+      try {
+        const emps = await api.getAllEmployees();
+        const sel = document.getElementById('empSelect');
+        (emps || []).filter(e => e.status === '有効').sort((a,b) => a.name.localeCompare(b.name,'ja')).forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = e.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) {}
+    }
+
+    async function loadBook() {
+      const empId = document.getElementById('empSelect').value;
+      const ym = document.getElementById('bookYM').value;
+      const el = document.getElementById('bookData');
+      if (!empId || !ym) { alert('従業員と年月を選択してください'); return; }
+      showLoading(el);
+      try {
+        const data = await api.getMonthlyAttendanceBook(empId, ym);
+        if (!data || !data.days) { el.innerHTML = '<div style="color:#999;">データがありません</div>'; return; }
+        const dowCls = d => d === '日' ? 'sun' : d === '土' ? 'sat' : '';
+        el.innerHTML = `
+          <div style="margin-bottom:8px;font-weight:bold;">${escHtml(data.empName)} - ${escHtml(data.storeName||'')}</div>
+          <div style="overflow-x:auto;">
+          <table class="book-table">
+            <tr><th>日</th><th>曜</th><th>出勤</th><th>退勤</th><th>休憩</th><th>実労働</th><th>時間外</th><th>賄</th><th>備考</th></tr>
+            ${data.days.map(d => `<tr>
+              <td>${d.dayNum}</td>
+              <td class="${dowCls(d.dayOfWeek)}">${d.dayOfWeek}</td>
+              <td>${d.clockIn?d.clockIn.substring(0,5):''}</td>
+              <td>${d.clockOut?d.clockOut.substring(0,5):''}</td>
+              <td>${d.breakMin||''}</td>
+              <td>${d.workMin||''}</td>
+              <td>${d.overtimeMin||''}</td>
+              <td>${(d.meal||[]).join(',')}</td>
+              <td style="text-align:left;font-size:11px;">${escHtml(d.note||'')}</td>
+            </tr>`).join('')}
+            <tr style="font-weight:bold;background:#f0f0f0;">
+              <td colspan="3">合計</td>
+              <td>出勤${data.totalWorkDays}日</td>
+              <td>${data.totalBreakMin||''}</td>
+              <td>${data.totalWorkMin||''}</td>
+              <td>${data.totalOvertimeMin||''}</td>
+              <td colspan="2"></td>
+            </tr>
+          </table>
+          </div>`;
+      } catch (e) { showError(el, e.message); }
+    }
+
+    async function exportPdf() {
+      const empId = document.getElementById('empSelect').value;
+      const ym = document.getElementById('bookYM').value;
+      if (!empId || !ym) { alert('従業員と年月を選択してください'); return; }
+      if (!confirm('PDF出力してGoogle Driveに保存しますか？')) return;
+      try {
+        const res = await api.generateAttendanceBookPdf(empId, ym);
+        if (res.success && res.fileUrl) {
+          alert('PDF出力完了');
+          window.open(res.fileUrl, '_blank');
+        } else {
+          alert(res.message || 'エラー');
+        }
+      } catch (e) { alert('エラー: ' + e.message); }
+    }
+
+    init();
+  </script>
+</body>
+</html>

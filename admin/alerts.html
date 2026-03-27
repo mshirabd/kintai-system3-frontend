@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アラートログ - 勤怠管理</title>
+  <link rel="stylesheet" href="../css/common.css">
+</head>
+<body>
+  <div id="nav-container"></div>
+  <div class="container">
+    <h1 style="font-size:20px;margin-bottom:16px;">アラートログ</h1>
+    <div style="margin-bottom:12px;">
+      <select id="statusFilter" class="form-control" style="max-width:160px;" onchange="render()">
+        <option value="">全て</option>
+        <option value="未対応" selected>未対応のみ</option>
+        <option value="対応済み">対応済みのみ</option>
+      </select>
+    </div>
+    <div class="card">
+      <div id="alertTable"><div class="loading">読み込み中...</div></div>
+    </div>
+  </div>
+
+  <!-- 打刻修正モーダル -->
+  <div class="modal-overlay" id="correctModal">
+    <div class="modal">
+      <h3>打刻修正</h3>
+      <div id="correctInfo" style="margin-bottom:12px;font-size:14px;color:#666;"></div>
+      <form id="correctForm">
+        <input type="hidden" id="correctAlertId">
+        <div class="form-group">
+          <label>退勤日</label>
+          <input type="date" id="correctDate" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>退勤時刻</label>
+          <input type="time" id="correctTime" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>備考</label>
+          <input type="text" id="correctNote" class="form-control" value="管理者修正">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-secondary" onclick="closeCorrectModal()">キャンセル</button>
+          <button type="button" class="btn btn-danger" onclick="resolveOnly()">修正なしで対応済み</button>
+          <button type="submit" class="btn btn-primary">修正して対応済み</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    if (!auth.requireAdmin()) throw '';
+    renderNav('alerts');
+
+    let alerts = [];
+
+    async function load() {
+      try {
+        alerts = await api.getAlertLogs();
+        render();
+      } catch (e) {
+        showError(document.getElementById('alertTable'), e.message);
+      }
+    }
+
+    function render() {
+      const filter = document.getElementById('statusFilter').value;
+      const filtered = filter ? alerts.filter(a => a.status === filter) : alerts;
+      const el = document.getElementById('alertTable');
+      if (filtered.length === 0) {
+        el.innerHTML = '<div style="color:#999;padding:12px;">アラートはありません</div>';
+        return;
+      }
+      el.innerHTML = `<table>
+        <tr><th>日時</th><th>種別</th><th>氏名</th><th>内容</th><th>状態</th><th>操作</th></tr>
+        ${filtered.map(a => `<tr>
+          <td style="font-size:12px;white-space:nowrap;">${escHtml(a.occurredAt)}</td>
+          <td>${escHtml(a.type)}</td>
+          <td>${escHtml(a.empName)}</td>
+          <td style="font-size:12px;">${escHtml(a.content)}</td>
+          <td><span class="status-badge ${a.status==='未対応'?'status-inactive':'status-active'}">${escHtml(a.status)}</span></td>
+          <td>${a.status === '未対応'
+            ? `<button class="btn btn-sm btn-primary" onclick="openCorrectModal('${a.alertId}')">対応</button>`
+            : ''}</td>
+        </tr>`).join('')}
+      </table>`;
+    }
+
+    function openCorrectModal(alertId) {
+      const a = alerts.find(x => x.alertId === alertId);
+      if (!a) return;
+      document.getElementById('correctAlertId').value = alertId;
+      document.getElementById('correctInfo').textContent = `${a.empName} - ${a.content}`;
+      // 日付をcontentから推定
+      const dateMatch = a.content.match(/(\d{4}-\d{2}-\d{2})/);
+      document.getElementById('correctDate').value = dateMatch ? dateMatch[1] : todayStr();
+      document.getElementById('correctTime').value = '';
+      document.getElementById('correctNote').value = '管理者修正';
+      document.getElementById('correctModal').classList.add('open');
+    }
+
+    function closeCorrectModal() {
+      document.getElementById('correctModal').classList.remove('open');
+    }
+
+    document.getElementById('correctForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const alertId = document.getElementById('correctAlertId').value;
+      const date = document.getElementById('correctDate').value;
+      const time = document.getElementById('correctTime').value;
+      const note = document.getElementById('correctNote').value;
+      if (!date || !time) { alert('日付と時刻を入力してください'); return; }
+      try {
+        const res = await api.correctAndResolveAlert(alertId, date, time, note);
+        if (res.success) { closeCorrectModal(); load(); }
+        else alert(res.message || 'エラー');
+      } catch (err) { alert('通信エラー: ' + err.message); }
+    });
+
+    async function resolveOnly() {
+      const alertId = document.getElementById('correctAlertId').value;
+      if (!confirm('修正なしで対応済みにしますか？')) return;
+      try {
+        const res = await api.resolveAlert(alertId);
+        if (res.success) { closeCorrectModal(); load(); }
+        else alert(res.message || 'エラー');
+      } catch (err) { alert('通信エラー: ' + err.message); }
+    }
+
+    load();
+  </script>
+</body>
+</html>

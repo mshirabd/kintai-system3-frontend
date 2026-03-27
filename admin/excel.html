@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Excel出力 - 勤怠管理</title>
+  <link rel="stylesheet" href="../css/common.css">
+</head>
+<body>
+  <div id="nav-container"></div>
+  <div class="container">
+    <h1 style="font-size:20px;margin-bottom:16px;">Excel出力</h1>
+    <div class="card">
+      <p style="font-size:14px;color:#666;margin-bottom:16px;">
+        時間補正付きExcelファイルを生成してGoogle Driveに保存します。<br>
+        出勤10:00以前→10:00、退勤22:00以降→22:00に補正。<br>
+        正社員は法定休憩を自動差引、8時間超を残業として計算します。
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="form-group" style="margin:0;">
+          <label>年月</label>
+          <input type="month" id="excelYM" class="form-control" style="width:180px;">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>店舗</label>
+          <select id="excelStore" class="form-control" style="width:200px;">
+            <option value="">全店舗</option>
+          </select>
+        </div>
+        <div style="padding-top:20px;">
+          <button class="btn btn-primary" id="excelBtn" onclick="generate()">Excel生成</button>
+        </div>
+      </div>
+      <div id="result" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    if (!auth.requireAdmin()) throw '';
+    renderNav('excel');
+
+    document.getElementById('excelYM').value = thisMonthStr();
+
+    async function init() {
+      try {
+        const stores = await api.getStores();
+        const sel = document.getElementById('excelStore');
+        (stores || []).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name;
+          sel.appendChild(opt);
+        });
+      } catch (e) {}
+    }
+
+    async function generate() {
+      const ym = document.getElementById('excelYM').value;
+      const storeId = document.getElementById('excelStore').value;
+      const el = document.getElementById('result');
+      const btn = document.getElementById('excelBtn');
+      if (!ym) { alert('年月を選択してください'); return; }
+
+      btn.disabled = true;
+      btn.textContent = '生成中...';
+      el.innerHTML = '<div class="loading">Excel生成中...（数十秒かかる場合があります）</div>';
+
+      try {
+        const res = await api.generateAttendanceExcel(ym, storeId);
+        if (res.success && res.fileUrl) {
+          el.innerHTML = `<div class="success-message">
+            Excel出力が完了しました。<br>
+            <a href="${escHtml(res.fileUrl)}" target="_blank" style="color:#1A73E8;font-weight:bold;">ファイルを開く</a>
+          </div>`;
+        } else {
+          el.innerHTML = `<div class="error-message">${escHtml(res.message || 'エラー')}</div>`;
+        }
+      } catch (e) {
+        el.innerHTML = `<div class="error-message">通信エラー: ${escHtml(e.message)}</div>`;
+      }
+      btn.disabled = false;
+      btn.textContent = 'Excel生成';
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>従業員管理 - 勤怠管理</title>
+  <link rel="stylesheet" href="../css/common.css">
+</head>
+<body>
+  <div id="nav-container"></div>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h1 style="font-size:20px;">従業員管理</h1>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ 追加</button>
+    </div>
+    <div class="card">
+      <div id="empTable"><div class="loading">読み込み中...</div></div>
+    </div>
+  </div>
+
+  <!-- 追加/編集モーダル -->
+  <div class="modal-overlay" id="empModal">
+    <div class="modal">
+      <h3 id="modalTitle">従業員追加</h3>
+      <form id="empForm">
+        <input type="hidden" id="editEmpId">
+        <div class="form-group">
+          <label>従業員ID</label>
+          <input type="text" id="fId" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>氏名</label>
+          <input type="text" id="fName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>メール</label>
+          <input type="email" id="fEmail" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>雇用形態</label>
+          <select id="fType" class="form-control">
+            <option value="正社員">正社員</option>
+            <option value="パート">パート</option>
+            <option value="アルバイト">アルバイト</option>
+            <option value="契約社員">契約社員</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>店舗</label>
+          <select id="fStore" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label>入社日</label>
+          <input type="date" id="fHireDate" class="form-control">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    if (!auth.requireAdmin()) throw '';
+    renderNav('employees');
+
+    let employees = [];
+    let stores = [];
+
+    async function load() {
+      try {
+        [employees, stores] = await Promise.all([api.getAllEmployees(), api.getStores()]);
+        // 店舗セレクト
+        const sel = document.getElementById('fStore');
+        sel.innerHTML = '<option value="">--</option>' +
+          (stores||[]).map(s => `<option value="${s.id}">${escHtml(s.name)}</option>`).join('');
+        renderTable();
+      } catch (e) {
+        showError(document.getElementById('empTable'), e.message);
+      }
+    }
+
+    function renderTable() {
+      const el = document.getElementById('empTable');
+      if (!employees || employees.length === 0) {
+        el.innerHTML = '<div style="color:#999;padding:12px;">従業員がいません</div>';
+        return;
+      }
+      el.innerHTML = `<table>
+        <tr><th>ID</th><th>氏名</th><th>雇用形態</th><th>店舗</th><th>状態</th><th>操作</th></tr>
+        ${employees.map(e => `<tr>
+          <td>${escHtml(e.id)}</td>
+          <td>${escHtml(e.name)}</td>
+          <td>${escHtml(e.employmentType)}</td>
+          <td>${escHtml(e.storeName)}</td>
+          <td><span class="status-badge ${e.status==='有効'?'status-active':'status-inactive'}">${escHtml(e.status)}</span></td>
+          <td>
+            <button class="btn btn-sm btn-secondary" onclick="openEditModal('${e.id}')">編集</button>
+            ${e.status==='有効'
+              ? `<button class="btn btn-sm btn-danger" onclick="toggleStatus('${e.id}','delete')">無効化</button>`
+              : `<button class="btn btn-sm btn-success" onclick="toggleStatus('${e.id}','reactivate')">有効化</button>`}
+          </td>
+        </tr>`).join('')}
+      </table>`;
+    }
+
+    function openAddModal() {
+      document.getElementById('modalTitle').textContent = '従業員追加';
+      document.getElementById('editEmpId').value = '';
+      document.getElementById('fId').value = '';
+      document.getElementById('fId').disabled = false;
+      document.getElementById('fName').value = '';
+      document.getElementById('fEmail').value = '';
+      document.getElementById('fType').value = '正社員';
+      document.getElementById('fStore').value = '';
+      document.getElementById('fHireDate').value = '';
+      document.getElementById('empModal').classList.add('open');
+    }
+
+    function openEditModal(id) {
+      const emp = employees.find(e => e.id === id);
+      if (!emp) return;
+      document.getElementById('modalTitle').textContent = '従業員編集';
+      document.getElementById('editEmpId').value = id;
+      document.getElementById('fId').value = id;
+      document.getElementById('fId').disabled = true;
+      document.getElementById('fName').value = emp.name;
+      document.getElementById('fEmail').value = emp.email;
+      document.getElementById('fType').value = emp.employmentType;
+      document.getElementById('fStore').value = emp.storeId;
+      document.getElementById('fHireDate').value = emp.hireDate;
+      document.getElementById('empModal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('empModal').classList.remove('open');
+    }
+
+    document.getElementById('empForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('editEmpId').value;
+      const data = {
+        id: document.getElementById('fId').value.trim(),
+        name: document.getElementById('fName').value.trim(),
+        email: document.getElementById('fEmail').value.trim(),
+        employmentType: document.getElementById('fType').value,
+        storeId: document.getElementById('fStore').value,
+        hireDate: document.getElementById('fHireDate').value,
+      };
+      try {
+        const res = editId
+          ? await api.updateEmployee(editId, data)
+          : await api.addEmployee(data);
+        if (res.success) {
+          closeModal();
+          load();
+        } else {
+          alert(res.message || 'エラー');
+        }
+      } catch (err) {
+        alert('通信エラー: ' + err.message);
+      }
+    });
+
+    async function toggleStatus(id, action) {
+      if (!confirm(action === 'delete' ? '無効化しますか？' : '有効化しますか？')) return;
+      try {
+        const res = action === 'delete'
+          ? await api.deleteEmployee(id)
+          : await api.reactivateEmployee(id);
+        if (res.success) load();
+        else alert(res.message || 'エラー');
+      } catch (err) {
+        alert('通信エラー: ' + err.message);
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

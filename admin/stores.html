@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>店舗管理 - 勤怠管理</title>
+  <link rel="stylesheet" href="../css/common.css">
+</head>
+<body>
+  <div id="nav-container"></div>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h1 style="font-size:20px;">店舗管理</h1>
+      <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ 追加</button>
+    </div>
+    <div class="card">
+      <div id="storeTable"><div class="loading">読み込み中...</div></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="storeModal">
+    <div class="modal">
+      <h3 id="modalTitle">店舗追加</h3>
+      <form id="storeForm">
+        <input type="hidden" id="editStoreId">
+        <div class="form-group">
+          <label>店舗ID</label>
+          <input type="text" id="fId" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>店舗名</label>
+          <input type="text" id="fName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>住所</label>
+          <input type="text" id="fAddress" class="form-control">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    if (!auth.requireAdmin()) throw '';
+    renderNav('stores');
+
+    let storeList = [];
+
+    async function load() {
+      try {
+        storeList = await api.getStores();
+        render();
+      } catch (e) {
+        showError(document.getElementById('storeTable'), e.message);
+      }
+    }
+
+    function render() {
+      const el = document.getElementById('storeTable');
+      if (!storeList || storeList.length === 0) {
+        el.innerHTML = '<div style="color:#999;padding:12px;">店舗がありません</div>';
+        return;
+      }
+      el.innerHTML = `<table>
+        <tr><th>ID</th><th>店舗名</th><th>住所</th><th>状態</th><th>操作</th></tr>
+        ${storeList.map(s => `<tr>
+          <td>${escHtml(s.id)}</td>
+          <td>${escHtml(s.name)}</td>
+          <td>${escHtml(s.address)}</td>
+          <td><span class="status-badge ${s.status==='有効'?'status-active':'status-inactive'}">${escHtml(s.status)}</span></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="openEditModal('${s.id}')">編集</button></td>
+        </tr>`).join('')}
+      </table>`;
+    }
+
+    function openAddModal() {
+      document.getElementById('modalTitle').textContent = '店舗追加';
+      document.getElementById('editStoreId').value = '';
+      document.getElementById('fId').value = '';
+      document.getElementById('fId').disabled = false;
+      document.getElementById('fName').value = '';
+      document.getElementById('fAddress').value = '';
+      document.getElementById('storeModal').classList.add('open');
+    }
+
+    function openEditModal(id) {
+      const s = storeList.find(x => x.id === id);
+      if (!s) return;
+      document.getElementById('modalTitle').textContent = '店舗編集';
+      document.getElementById('editStoreId').value = id;
+      document.getElementById('fId').value = id;
+      document.getElementById('fId').disabled = true;
+      document.getElementById('fName').value = s.name;
+      document.getElementById('fAddress').value = s.address;
+      document.getElementById('storeModal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('storeModal').classList.remove('open');
+    }
+
+    document.getElementById('storeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('editStoreId').value;
+      const data = {
+        id: document.getElementById('fId').value.trim(),
+        name: document.getElementById('fName').value.trim(),
+        address: document.getElementById('fAddress').value.trim(),
+      };
+      try {
+        const res = editId
+          ? await api.updateStore(editId, data)
+          : await api.addStore(data);
+        if (res.success) { closeModal(); load(); }
+        else alert(res.message || 'エラー');
+      } catch (err) { alert('通信エラー: ' + err.message); }
+    });
+
+    load();
+  </script>
+</body>
+</html>

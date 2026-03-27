@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>勤怠集計 - 勤怠管理</title>
+  <link rel="stylesheet" href="../css/common.css">
+</head>
+<body>
+  <div id="nav-container"></div>
+  <div class="container">
+    <h1 style="font-size:20px;margin-bottom:16px;">勤怠集計</h1>
+
+    <!-- タブ -->
+    <div style="display:flex;gap:4px;margin-bottom:16px;">
+      <button class="btn btn-sm btn-primary" id="tabToday" onclick="showTab('today')">今日の出勤</button>
+      <button class="btn btn-sm btn-secondary" id="tabDaily" onclick="showTab('daily')">日次集計</button>
+      <button class="btn btn-sm btn-secondary" id="tabMonthly" onclick="showTab('monthly')">月次集計</button>
+    </div>
+
+    <!-- 今日の出勤 -->
+    <div id="panelToday" class="card">
+      <h2>今日の出勤状況</h2>
+      <div id="todayData"><div class="loading">読み込み中...</div></div>
+    </div>
+
+    <!-- 日次集計 -->
+    <div id="panelDaily" class="card" style="display:none;">
+      <h2>日次集計</h2>
+      <div style="margin-bottom:12px;">
+        <input type="date" id="dailyDate" class="form-control" style="max-width:200px;">
+        <button class="btn btn-sm btn-primary" style="margin-left:8px;" onclick="loadDaily()">表示</button>
+      </div>
+      <div id="dailyData"></div>
+    </div>
+
+    <!-- 月次集計 -->
+    <div id="panelMonthly" class="card" style="display:none;">
+      <h2>月次集計</h2>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <input type="month" id="monthlyYM" class="form-control" style="max-width:200px;">
+        <button class="btn btn-sm btn-primary" onclick="loadMonthly()">表示</button>
+        <button class="btn btn-sm btn-success" onclick="runAggregate()">集計実行</button>
+      </div>
+      <div id="monthlyData"></div>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    if (!auth.requireAdmin()) throw '';
+    renderNav('summary');
+
+    document.getElementById('dailyDate').value = todayStr();
+    document.getElementById('monthlyYM').value = thisMonthStr();
+
+    function showTab(tab) {
+      ['today','daily','monthly'].forEach(t => {
+        document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).style.display = t === tab ? '' : 'none';
+        document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).className = 'btn btn-sm ' + (t === tab ? 'btn-primary' : 'btn-secondary');
+      });
+    }
+
+    async function loadToday() {
+      const el = document.getElementById('todayData');
+      showLoading(el);
+      try {
+        const data = await api.getTodayStatus();
+        if (!data || data.length === 0) {
+          el.innerHTML = '<div style="color:#999;">今日の出勤データはありません</div>';
+          return;
+        }
+        el.innerHTML = `<table>
+          <tr><th>氏名</th><th>店舗</th><th>出勤</th><th>退勤</th><th>経過</th><th>状態</th></tr>
+          ${data.map(d => `<tr>
+            <td>${escHtml(d.empName)}</td><td>${escHtml(d.storeName)}</td>
+            <td>${escHtml(d.clockIn)}</td><td>${escHtml(d.clockOut)}</td>
+            <td>${escHtml(d.elapsed)}</td><td>${escHtml(d.status)}</td>
+          </tr>`).join('')}
+        </table>`;
+      } catch (e) { showError(el, e.message); }
+    }
+
+    async function loadDaily() {
+      const date = document.getElementById('dailyDate').value;
+      const el = document.getElementById('dailyData');
+      if (!date) return;
+      showLoading(el);
+      try {
+        const data = await api.getDailySummary(date);
+        if (!data || data.length === 0) {
+          el.innerHTML = '<div style="color:#999;">データがありません</div>';
+          return;
+        }
+        el.innerHTML = `<table>
+          <tr><th>氏名</th><th>店舗</th><th>出勤</th><th>退勤</th><th>休憩</th><th>実労働</th><th>備考</th></tr>
+          ${data.map(d => `<tr>
+            <td>${escHtml(d.empName)}</td><td>${escHtml(d.storeName)}</td>
+            <td>${d.clockIn?d.clockIn.substring(0,5):''}</td>
+            <td>${d.clockOut?d.clockOut.substring(0,5):''}</td>
+            <td>${d.breakMin||''}</td><td>${minToHM(d.workMin)}</td>
+            <td>${escHtml(d.note||'')}</td>
+          </tr>`).join('')}
+        </table>`;
+      } catch (e) { showError(el, e.message); }
+    }
+
+    async function loadMonthly() {
+      const ym = document.getElementById('monthlyYM').value;
+      const el = document.getElementById('monthlyData');
+      if (!ym) return;
+      showLoading(el);
+      try {
+        const data = await api.getMonthlySummary(ym);
+        if (!data || data.length === 0) {
+          el.innerHTML = '<div style="color:#999;">集計データがありません。「集計実行」を押してください。</div>';
+          return;
+        }
+        el.innerHTML = `<table>
+          <tr><th>氏名</th><th>出勤日数</th><th>総労働</th><th>残業</th></tr>
+          ${data.map(d => `<tr>
+            <td>${escHtml(d.empName)}</td><td>${d.workDays}</td>
+            <td>${minToHM(d.totalMin)}</td><td>${minToHM(d.overtimeMin)}</td>
+          </tr>`).join('')}
+        </table>`;
+      } catch (e) { showError(el, e.message); }
+    }
+
+    async function runAggregate() {
+      const ym = document.getElementById('monthlyYM').value;
+      if (!ym || !confirm(`${ym} の月次集計を実行しますか？\n（集計期間: 前月21日〜当月20日）`)) return;
+      try {
+        const res = await api.aggregateMonthlySummary(ym);
+        alert(res.message || '完了');
+        loadMonthly();
+      } catch (e) { alert('エラー: ' + e.message); }
+    }
+
+    loadToday();
+  </script>
+</body>
+</html>
