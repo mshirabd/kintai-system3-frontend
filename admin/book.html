@@ -94,12 +94,20 @@
       const empId = document.getElementById('empSelect').value;
       const ym = document.getElementById('bookYM').value;
       if (!empId || !ym) { alert('従業員と年月を選択してください'); return; }
-      if (!confirm('PDF出力してGoogle Driveに保存しますか？')) return;
+      if (!confirm('PDF出力しますか？')) return;
       try {
         const res = await api.generateAttendanceBookPdf(empId, ym);
-        if (res.success && res.fileUrl) {
-          alert('PDF出力完了');
-          window.open(res.fileUrl, '_blank');
+        if (res.success && res.base64) {
+          const bin = atob(res.base64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = res.fileName || 'attendance.pdf';
+          a.click();
+          URL.revokeObjectURL(url);
         } else {
           alert(res.message || 'エラー');
         }
