@@ -46,6 +46,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/auth.js"></script>
   <script src="../js/api.js"></script>
@@ -131,10 +132,47 @@
 
     async function runAggregate() {
       const ym = document.getElementById('monthlyYM').value;
-      if (!ym || !confirm(`${ym} の月次集計を実行しますか？\n（集計期間: 前月21日〜当月20日）`)) return;
+      if (!ym || !confirm(`${ym} の月次集計を実行しますか？\n（集計期間: 前月21日〜当月20日）\n\n集計完了後、全員の出勤簿PDFをダウンロードします。`)) return;
+      const el = document.getElementById('monthlyData');
       try {
+        el.innerHTML = '<div class="loading">月次集計を実行中...</div>';
         const res = await api.aggregateMonthlySummary(ym);
-        alert(res.message || '完了');
+        loadMonthly();
+
+        // 全員の出勤簿PDF一括出力
+        el.innerHTML = '<div class="loading">出勤簿PDFを生成中...</div>';
+        const emps = await api.getAllEmployees();
+        const active = (emps || []).filter(e => e.status === '有効')
+          .sort((a, b) => (a.storeId||'').localeCompare(b.storeId||'') || (a.id||'').localeCompare(b.id||''));
+
+        if (active.length > 0) {
+          const mergedPdf = await PDFLib.PDFDocument.create();
+          let count = 0;
+          for (const emp of active) {
+            count++;
+            el.innerHTML = `<div class="loading">出勤簿PDF生成中... ${count}/${active.length}（${escHtml(emp.name)}）</div>`;
+            try {
+              const pdfRes = await api.generateAttendanceBookPdf(emp.id, ym);
+              if (pdfRes.success && pdfRes.base64) {
+                const pdfBytes = Uint8Array.from(atob(pdfRes.base64), c => c.charCodeAt(0));
+                const srcDoc = await PDFLib.PDFDocument.load(pdfBytes);
+                const pages = await mergedPdf.copyPages(srcDoc, srcDoc.getPageIndices());
+                pages.forEach(p => mergedPdf.addPage(p));
+              }
+            } catch (e) {
+              console.error(`PDF生成エラー: ${emp.name}`, e);
+            }
+          }
+          const mergedBytes = await mergedPdf.save();
+          const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `出勤簿_全員_${ym}.pdf`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+
         loadMonthly();
       } catch (e) { alert('エラー: ' + e.message); }
     }
