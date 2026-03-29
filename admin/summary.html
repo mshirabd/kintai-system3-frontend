@@ -120,9 +120,9 @@
           return;
         }
         el.innerHTML = `<table>
-          <tr><th>氏名</th><th>出勤日数</th><th>総労働</th><th>残業</th></tr>
+          <tr><th>氏名</th><th>店舗</th><th>出勤日数</th><th>総労働</th><th>残業</th></tr>
           ${data.map(d => `<tr>
-            <td>${escHtml(d.empName)}</td><td>${d.workDays}</td>
+            <td>${escHtml(d.empName)}</td><td>${escHtml(d.storeName||'')}</td><td>${d.workDays}</td>
             <td>${minToHM(d.totalMin)}</td><td>${minToHM(d.overtimeMin)}</td>
           </tr>`).join('')}
         </table>`;
