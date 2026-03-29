@@ -71,18 +71,18 @@
               <td class="${dowCls(d.dayOfWeek)}">${d.dayOfWeek}</td>
               <td>${d.clockIn?d.clockIn.substring(0,5):''}</td>
               <td>${d.clockOut?d.clockOut.substring(0,5):''}</td>
-              <td>${d.breakMin||''}</td>
-              <td>${d.workMin||''}</td>
-              <td>${d.overtimeMin||''}</td>
+              <td>${minToHM(d.breakMin)}</td>
+              <td>${minToHM(d.workMin)}</td>
+              <td>${minToHM(d.overtimeMin)}</td>
               <td>${(d.meal||[]).join(',')}</td>
               <td style="text-align:left;font-size:11px;">${escHtml(d.note||'')}</td>
             </tr>`).join('')}
             <tr style="font-weight:bold;background:#f0f0f0;">
               <td colspan="3">合計</td>
               <td>出勤${data.totalWorkDays}日</td>
-              <td>${data.totalBreakMin||''}</td>
-              <td>${data.totalWorkMin||''}</td>
-              <td>${data.totalOvertimeMin||''}</td>
+              <td>${minToHM(data.totalBreakMin)}</td>
+              <td>${minToHM(data.totalWorkMin)}</td>
+              <td>${minToHM(data.totalOvertimeMin)}</td>
               <td colspan="2"></td>
             </tr>
           </table>
