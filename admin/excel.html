@@ -12,7 +12,7 @@
     <h1 style="font-size:20px;margin-bottom:16px;">Excel出力</h1>
     <div class="card">
       <p style="font-size:14px;color:#666;margin-bottom:16px;">
-        時間補正付きExcelファイルを生成してGoogle Driveに保存します。<br>
+        時間補正付きExcelファイルを生成してダウンロードします。<br>
         出勤10:00以前→10:00、退勤22:00以降→22:00に補正。<br>
         正社員は法定休憩を自動差引、8時間超を残業として計算します。
       </p>
@@ -71,11 +71,18 @@
 
       try {
         const res = await api.generateAttendanceExcel(ym, storeId);
-        if (res.success && res.fileUrl) {
-          el.innerHTML = `<div class="success-message">
-            Excel出力が完了しました。<br>
-            <a href="${escHtml(res.fileUrl)}" target="_blank" style="color:#1A73E8;font-weight:bold;">ファイルを開く</a>
-          </div>`;
+        if (res.success && res.base64) {
+          const bin = atob(res.base64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = res.fileName || 'attendance.xlsx';
+          a.click();
+          URL.revokeObjectURL(url);
+          el.innerHTML = '<div class="success-message">ダウンロードが開始されました。</div>';
         } else {
           el.innerHTML = `<div class="error-message">${escHtml(res.message || 'エラー')}</div>`;
         }
