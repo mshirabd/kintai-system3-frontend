@@ -77,12 +77,29 @@
     const video = document.getElementById('video');
     const statusEl = document.getElementById('status');
     let scanning = true;
+    let scanTimer = null;
 
     function startScan() {
       document.getElementById('start-btn').style.display = 'none';
       document.getElementById('video-container').style.display = 'block';
       statusEl.textContent = 'カメラを起動中...';
+      // 20秒後にタイムアウトで初期画面に戻る
+      scanTimer = setTimeout(() => {
+        scanning = false;
+        stopCamera();
+        document.getElementById('video-container').style.display = 'none';
+        document.getElementById('start-btn').style.display = '';
+        statusEl.textContent = 'タイムアウトしました。もう一度お試しください。';
+      }, 20000);
       startCamera();
+    }
+
+    function stopCamera() {
+      const stream = video.srcObject;
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
     }
 
     async function startCamera() {
@@ -161,10 +178,12 @@
       if (fromQR && code.length > 5) {
         code = code.slice(0, -5);
       }
+      if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
       statusEl.textContent = `${code} を確認中...`;
       try {
         const res = await api.getEmployeeInfo(code);
         if (res.success) {
+          stopCamera();
           location.href = `attendance.html?id=${encodeURIComponent(code)}`;
         } else {
           statusEl.textContent = res.message || '従業員が見つかりません。';
