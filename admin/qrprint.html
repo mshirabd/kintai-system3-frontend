@@ -7,13 +7,18 @@
   <link rel="stylesheet" href="../css/common.css">
   <style>
     /* ── 画面表示用 ─────────────────────────── */
-    .qr-grid {
+    .qr-page {
+      width: 210mm;
+      height: 297mm;
+      margin: 0 auto 20px;
+      padding: 11mm 14mm;
+      box-sizing: border-box;
       display: grid;
-      grid-template-columns: repeat(2, 91mm);
-      grid-auto-rows: 55mm;
+      grid-template-columns: 91mm 91mm;
+      grid-template-rows: repeat(5, 55mm);
       gap: 0;
-      justify-content: center;
-      margin-top: 16px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     .qr-card {
       width: 91mm;
@@ -26,14 +31,14 @@
       justify-content: center;
       gap: 8px;
       padding: 4px 8px;
-      background: #fff;
       overflow: hidden;
     }
     .qr-card canvas { flex-shrink: 0; }
-    .qr-info { text-align: left; }
+    .qr-info { text-align: left; min-width: 0; }
     .qr-name { font-weight: bold; font-size: 14px; line-height: 1.3; }
     .qr-id { font-size: 11px; color: #666; }
     .qr-store { font-size: 11px; color: #888; margin-top: 2px; }
+    .qr-type { font-size: 10px; color: #aaa; margin-top: 1px; }
 
     /* ── 印刷用 ───────────────────────────── */
     @media print {
@@ -42,12 +47,19 @@
         size: A4 portrait;
         margin: 0;
       }
-      body { margin: 0; padding: 0; }
-      .container { padding: 0; max-width: none; }
-      .qr-grid {
+      html, body {
         margin: 0;
-        padding: 11mm 14mm;
-        gap: 0;
+        padding: 0;
+        -webkit-print-color-adjust: exact;
+      }
+      .container { padding: 0; max-width: none; }
+      .qr-page {
+        box-shadow: none;
+        margin: 0;
+        page-break-after: always;
+      }
+      .qr-page:last-child {
+        page-break-after: auto;
       }
       .qr-card {
         border: none;
@@ -86,19 +98,30 @@
           return;
         }
 
-        el.innerHTML = '<div class="qr-grid">' +
-          active.map(e => `
+        // 10件ずつページに分割
+        const pages = [];
+        for (let i = 0; i < active.length; i += 10) {
+          pages.push(active.slice(i, i + 10));
+        }
+
+        el.innerHTML = pages.map(page => {
+          const cards = page.map(e => `
             <div class="qr-card">
               <canvas id="qr-${e.id}"></canvas>
               <div class="qr-info">
                 <div class="qr-name">${escHtml(e.name)}</div>
                 <div class="qr-id">${escHtml(e.id)}</div>
                 <div class="qr-store">${escHtml(e.storeName || '')}</div>
+                <div class="qr-type">${escHtml(e.employmentType || '')}</div>
               </div>
             </div>
-          `).join('') + '</div>';
+          `).join('');
+          // 空セルで10面を埋める
+          const empty = Array(10 - page.length).fill('<div class="qr-card"></div>').join('');
+          return `<div class="qr-page">${cards}${empty}</div>`;
+        }).join('');
 
-        // QRコード生成（従業員コードのみ）
+        // QRコード生成
         active.forEach(e => {
           QRCode.toCanvas(document.getElementById('qr-' + e.id), e.id, {
             width: 120,
