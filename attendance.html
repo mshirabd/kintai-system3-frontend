@@ -9,16 +9,6 @@
     .attendance-header { text-align: center; padding: 16px 0; }
     .emp-name { font-size: 22px; font-weight: bold; }
     .store-name { font-size: 14px; color: #666; }
-    .today-logs { margin: 12px 0; }
-    .today-logs .log-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 12px;
-      background: #f8f9fa;
-      border-radius: 4px;
-      margin: 4px 0;
-      font-size: 14px;
-    }
     #result {
       text-align: center;
       padding: 16px;
@@ -27,8 +17,6 @@
       font-size: 16px;
       display: none;
     }
-    .back-link { text-align: center; margin-top: 20px; }
-    .back-link a { color: #1A73E8; text-decoration: none; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -50,15 +38,6 @@
       </div>
 
       <div id="result"></div>
-
-      <div class="today-logs">
-        <h3 style="font-size:14px;color:#666;margin-bottom:6px;">本日の打刻</h3>
-        <div id="todayLogs"></div>
-      </div>
-    </div>
-
-    <div class="back-link">
-      <a href="index.html">QRスキャン画面に戻る</a>
     </div>
   </div>
 
@@ -86,22 +65,10 @@
         employeeInfo = res;
         document.getElementById('empName').textContent = res.employeeName;
         document.getElementById('storeName').textContent = res.storeName;
-        renderTodayLogs(res.todayLogs || []);
         updateButtons(res.todayLogs || []);
       } catch (e) {
         document.getElementById('empName').textContent = '通信エラー';
       }
-    }
-
-    function renderTodayLogs(logs) {
-      const el = document.getElementById('todayLogs');
-      if (logs.length === 0) {
-        el.innerHTML = '<div style="color:#999;font-size:13px;">まだ打刻がありません</div>';
-        return;
-      }
-      el.innerHTML = logs.map(l =>
-        `<div class="log-item"><span>${escHtml(l.type)}</span><span>${escHtml(l.time)}</span></div>`
-      ).join('');
     }
 
     function updateButtons(logs) {
@@ -136,9 +103,9 @@
         });
         if (res.success) {
           resultEl.className = 'success-message';
-          resultEl.textContent = res.message;
-          // 再読み込みしてログ更新
-          setTimeout(() => init(), 1000);
+          resultEl.textContent = '打刻しました';
+          // 3秒後にQRスキャン画面に戻る
+          setTimeout(() => { location.href = 'index.html'; }, 3000);
         } else {
           resultEl.className = 'error-message';
           resultEl.textContent = res.message;
