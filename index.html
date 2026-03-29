@@ -172,7 +172,7 @@
      * @param {string} raw - 読み取った文字列
      * @param {boolean} [fromQR=false] - QRコード経由の場合 true
      */
-    async function handleCode(raw, fromQR) {
+    function handleCode(raw, fromQR) {
       let code = (raw || '').trim();
       if (!code) return;
       // QR読み取りの場合、末尾の複製防止文字列（5文字）を除去
@@ -180,20 +180,9 @@
         code = code.slice(0, -5);
       }
       if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
-      statusEl.textContent = `${code} を確認中...`;
-      try {
-        const res = await api.getEmployeeInfo(code);
-        if (res.success) {
-          stopCamera();
-          location.href = `attendance.html?id=${encodeURIComponent(code)}`;
-        } else {
-          statusEl.textContent = res.message || '従業員が見つかりません。';
-          scanning = true;
-        }
-      } catch (e) {
-        statusEl.textContent = '通信エラー: ' + e.message;
-        scanning = true;
-      }
+      stopCamera();
+      // 検証は attendance.html 側で行うので直接遷移
+      location.href = `attendance.html?id=${encodeURIComponent(code)}`;
     }
   </script>
 </body>
