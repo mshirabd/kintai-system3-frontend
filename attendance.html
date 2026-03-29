@@ -65,6 +65,15 @@
 
     startClock('clock');
 
+    // 15秒無操作でQRスキャンに戻る
+    let idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
+    function resetIdle() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
+    }
+    document.addEventListener('click', resetIdle);
+    document.addEventListener('touchstart', resetIdle);
+
     // 打刻ログをバックグラウンドで取得（ボタンはすぐ操作可能）
     async function init() {
       try {
