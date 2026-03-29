@@ -121,9 +121,13 @@
           return `<div class="qr-page">${cards}${empty}</div>`;
         }).join('');
 
-        // QRコード生成
+        // QRコード生成（従業員コード + ランダム5文字で複製防止）
         active.forEach(e => {
-          QRCode.toCanvas(document.getElementById('qr-' + e.id), e.id, {
+          const suffix = Array.from({length: 5}, () =>
+            'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+              [Math.random() * 54 | 0]
+          ).join('');
+          QRCode.toCanvas(document.getElementById('qr-' + e.id), e.id + suffix, {
             width: 120,
             margin: 1,
             errorCorrectionLevel: 'M',

@@ -108,8 +108,10 @@
       scan();
     }
 
-    async function handleCode(code) {
-      code = (code || '').trim();
+    async function handleCode(raw) {
+      // QRコードには複製防止用のランダム文字列が付加されている場合がある
+      // 従業員コード部分（例: EMP001）だけを抽出する
+      const code = (raw || '').trim().replace(/^(EMP\d+).*$/, '$1');
       if (!code) return;
       statusEl.textContent = `${code} を確認中...`;
       try {
