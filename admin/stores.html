@@ -23,9 +23,9 @@
       <h3 id="modalTitle">店舗追加</h3>
       <form id="storeForm">
         <input type="hidden" id="editStoreId">
-        <div class="form-group">
+        <div class="form-group" id="fIdGroup">
           <label>店舗ID</label>
-          <input type="text" id="fId" class="form-control" required>
+          <input type="text" id="fId" class="form-control" readonly>
         </div>
         <div class="form-group">
           <label>店舗名</label>
@@ -83,8 +83,8 @@
     function openAddModal() {
       document.getElementById('modalTitle').textContent = '店舗追加';
       document.getElementById('editStoreId').value = '';
+      document.getElementById('fIdGroup').style.display = 'none';
       document.getElementById('fId').value = '';
-      document.getElementById('fId').disabled = false;
       document.getElementById('fName').value = '';
       document.getElementById('fAddress').value = '';
       document.getElementById('storeModal').classList.add('open');
@@ -95,8 +95,8 @@
       if (!s) return;
       document.getElementById('modalTitle').textContent = '店舗編集';
       document.getElementById('editStoreId').value = id;
+      document.getElementById('fIdGroup').style.display = '';
       document.getElementById('fId').value = id;
-      document.getElementById('fId').disabled = true;
       document.getElementById('fName').value = s.name;
       document.getElementById('fAddress').value = s.address;
       document.getElementById('storeModal').classList.add('open');

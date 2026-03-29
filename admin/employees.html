@@ -24,9 +24,9 @@
       <h3 id="modalTitle">従業員追加</h3>
       <form id="empForm">
         <input type="hidden" id="editEmpId">
-        <div class="form-group">
+        <div class="form-group" id="fIdGroup">
           <label>従業員ID</label>
-          <input type="text" id="fId" class="form-control" required>
+          <input type="text" id="fId" class="form-control" readonly>
         </div>
         <div class="form-group">
           <label>氏名</label>
@@ -112,8 +112,8 @@
     function openAddModal() {
       document.getElementById('modalTitle').textContent = '従業員追加';
       document.getElementById('editEmpId').value = '';
+      document.getElementById('fIdGroup').style.display = 'none';
       document.getElementById('fId').value = '';
-      document.getElementById('fId').disabled = false;
       document.getElementById('fName').value = '';
       document.getElementById('fEmail').value = '';
       document.getElementById('fType').value = '正社員';
@@ -127,8 +127,8 @@
       if (!emp) return;
       document.getElementById('modalTitle').textContent = '従業員編集';
       document.getElementById('editEmpId').value = id;
+      document.getElementById('fIdGroup').style.display = '';
       document.getElementById('fId').value = id;
-      document.getElementById('fId').disabled = true;
       document.getElementById('fName').value = emp.name;
       document.getElementById('fEmail').value = emp.email;
       document.getElementById('fType').value = emp.employmentType;
