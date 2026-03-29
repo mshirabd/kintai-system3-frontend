@@ -99,7 +99,7 @@
           const codes = await detector.detect(canvas);
           if (codes.length > 0) {
             scanning = false;
-            handleCode(codes[0].rawValue);
+            handleCode(codes[0].rawValue, true);
             return;
           }
         } catch (e) {}
@@ -108,11 +108,18 @@
       scan();
     }
 
-    async function handleCode(raw) {
-      // QRコードには複製防止用のランダム文字列が付加されている場合がある
-      // 従業員コード部分（例: EMP001）だけを抽出する
-      const code = (raw || '').trim().replace(/^(EMP\d+).*$/, '$1');
+    /**
+     * QRコード or 手動入力から従業員コードを処理する。
+     * @param {string} raw - 読み取った文字列
+     * @param {boolean} [fromQR=false] - QRコード経由の場合 true
+     */
+    async function handleCode(raw, fromQR) {
+      let code = (raw || '').trim();
       if (!code) return;
+      // QR読み取りの場合、末尾の複製防止文字列（5文字）を除去
+      if (fromQR && code.length > 5) {
+        code = code.slice(0, -5);
+      }
       statusEl.textContent = `${code} を確認中...`;
       try {
         const res = await api.getEmployeeInfo(code);
