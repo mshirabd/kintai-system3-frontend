@@ -24,7 +24,7 @@
     <div class="card">
       <div class="attendance-header">
         <div class="clock" id="clock"></div>
-        <div class="emp-name" id="empName">読み込み中...</div>
+        <div class="emp-name" id="empName"></div>
         <div class="store-name" id="storeName"></div>
       </div>
 
@@ -57,34 +57,33 @@
 
     let employeeInfo = null;
 
-    // URLパラメータから名前・店舗を即時表示
+    // URLパラメータから名前・店舗を即時表示（API不要）
     const preloadName  = params.get('name') || '';
     const preloadStore = params.get('store') || '';
-    if (preloadName) {
-      document.getElementById('empName').textContent = preloadName;
-      document.getElementById('storeName').textContent = preloadStore;
-    }
+    document.getElementById('empName').textContent = preloadName || employeeCode;
+    document.getElementById('storeName').textContent = preloadStore;
 
     startClock('clock');
 
+    // 打刻ログをバックグラウンドで取得（ボタンはすぐ操作可能）
     async function init() {
       try {
         const res = await api.getEmployeeStatus(employeeCode);
-        if (!res.success) {
-          document.getElementById('empName').textContent = res.message || 'エラー';
-          return;
+        if (res.success) {
+          updateButtons(res.todayLogs || []);
         }
-        // 名前がまだ表示されていなければ getEmployeeInfo で取得
+        // 名前が未取得の場合のみ補完
         if (!preloadName) {
           const info = await api.getEmployeeInfo(employeeCode);
           if (info.success) {
             document.getElementById('empName').textContent = info.employeeName;
             document.getElementById('storeName').textContent = info.storeName;
+          } else {
+            document.getElementById('empName').textContent = info.message || 'エラー';
           }
         }
-        updateButtons(res.todayLogs || []);
       } catch (e) {
-        document.getElementById('empName').textContent = '通信エラー';
+        // ネットワークエラーでもボタンは使える
       }
     }
 
