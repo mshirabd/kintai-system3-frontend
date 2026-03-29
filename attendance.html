@@ -104,6 +104,8 @@
         if (res.success) {
           resultEl.className = 'success-message';
           resultEl.textContent = '打刻しました';
+          // 全ボタン無効化
+          document.querySelectorAll('.punch-btn').forEach(b => b.disabled = true);
           // 3秒後にQRスキャン画面に戻る
           setTimeout(() => { location.href = 'index.html'; }, 3000);
         } else {
