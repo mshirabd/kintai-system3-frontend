@@ -22,12 +22,14 @@
       <input type="month" id="bookYM" class="form-control" style="max-width:180px;">
       <button class="btn btn-sm btn-primary" onclick="loadBook()">表示</button>
       <button class="btn btn-sm btn-success" onclick="exportPdf()">PDF出力</button>
+      <button class="btn btn-sm btn-secondary" onclick="exportAllPdf()">全員一括PDF</button>
     </div>
     <div class="card">
       <div id="bookData"><div style="color:#999;padding:12px;">従業員と年月を選択してください</div></div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/auth.js"></script>
   <script src="../js/api.js"></script>
@@ -112,6 +114,54 @@
           alert(res.message || 'エラー');
         }
       } catch (e) { alert('エラー: ' + e.message); }
+    }
+
+    async function exportAllPdf() {
+      const ym = document.getElementById('bookYM').value;
+      if (!ym) { alert('年月を選択してください'); return; }
+      if (!confirm(`${ym} の全従業員の出勤簿PDFを一括出力しますか？`)) return;
+
+      const el = document.getElementById('bookData');
+      try {
+        const emps = await api.getAllEmployees();
+        const active = (emps || []).filter(e => e.status === '有効')
+          .sort((a, b) => (a.storeId||'').localeCompare(b.storeId||'') || (a.id||'').localeCompare(b.id||''));
+
+        if (active.length === 0) { alert('有効な従業員がいません'); return; }
+
+        const mergedPdf = await PDFLib.PDFDocument.create();
+        let count = 0;
+
+        for (const emp of active) {
+          count++;
+          el.innerHTML = `<div class="loading">PDF生成中... ${count}/${active.length}（${escHtml(emp.name)}）</div>`;
+
+          try {
+            const res = await api.generateAttendanceBookPdf(emp.id, ym);
+            if (res.success && res.base64) {
+              const pdfBytes = Uint8Array.from(atob(res.base64), c => c.charCodeAt(0));
+              const srcDoc = await PDFLib.PDFDocument.load(pdfBytes);
+              const pages = await mergedPdf.copyPages(srcDoc, srcDoc.getPageIndices());
+              pages.forEach(p => mergedPdf.addPage(p));
+            }
+          } catch (e) {
+            console.error(`PDF生成エラー: ${emp.name}`, e);
+          }
+        }
+
+        const mergedBytes = await mergedPdf.save();
+        const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `出勤簿_全員_${ym}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        el.innerHTML = '<div class="success-message">全員分のPDFをダウンロードしました。</div>';
+      } catch (e) {
+        el.innerHTML = `<div class="error-message">エラー: ${escHtml(e.message)}</div>`;
+      }
     }
 
     init();
