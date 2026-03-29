@@ -75,9 +75,7 @@
       const types = logs.map(l => l.type);
       const buttons = document.querySelectorAll('.punch-btn');
       buttons.forEach(btn => {
-        const type = btn.dataset.type;
-        const isMeal = type.startsWith('賄い');
-        if (!isMeal && types.includes(type)) {
+        if (types.includes(btn.dataset.type)) {
           btn.disabled = true;
         }
       });
