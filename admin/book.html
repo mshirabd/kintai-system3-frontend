@@ -65,7 +65,7 @@
           <div style="margin-bottom:8px;font-weight:bold;">${escHtml(data.empName)}（${escHtml(data.employmentType||'')}） - ${escHtml(data.storeName||'')}</div>
           <div style="overflow-x:auto;">
           <table class="book-table">
-            <tr><th>日</th><th>曜</th><th>出勤</th><th>退勤</th><th>休憩</th><th>実労働</th><th>時間外</th><th>賄</th><th>備考</th></tr>
+            <tr><th>日</th><th>曜</th><th>出勤</th><th>退勤</th><th>休憩</th><th>実労働</th><th>時間外</th><th>まかない</th><th>備考</th></tr>
             ${data.days.map(d => `<tr>
               <td>${d.dayNum}</td>
               <td class="${dowCls(d.dayOfWeek)}">${d.dayOfWeek}</td>
