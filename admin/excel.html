@@ -71,7 +71,6 @@
 
       try {
         const res = await api.generateAttendanceExcel(ym, storeId);
-        console.log('Excel response keys:', Object.keys(res), 'base64 length:', (res.base64||'').length);
         if (res.success && res.base64) {
           const bin = atob(res.base64);
           const bytes = new Uint8Array(bin.length);
