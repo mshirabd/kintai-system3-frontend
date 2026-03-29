@@ -71,6 +71,7 @@
 
       try {
         const res = await api.generateAttendanceExcel(ym, storeId);
+        console.log('Excel response keys:', Object.keys(res), 'base64 length:', (res.base64||'').length);
         if (res.success && res.base64) {
           const bin = atob(res.base64);
           const bytes = new Uint8Array(bin.length);
@@ -84,7 +85,7 @@
           URL.revokeObjectURL(url);
           el.innerHTML = '<div class="success-message">ダウンロードが開始されました。</div>';
         } else {
-          el.innerHTML = `<div class="error-message">${escHtml(res.message || 'エラー')}</div>`;
+          el.innerHTML = `<div class="error-message">${escHtml(res.message || 'ダウンロードデータの取得に失敗しました。')}</div>`;
         }
       } catch (e) {
         el.innerHTML = `<div class="error-message">通信エラー: ${escHtml(e.message)}</div>`;
