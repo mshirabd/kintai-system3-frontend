@@ -56,6 +56,8 @@
     </div>
   </div>
 
+  <!-- jsQR: iOS Safari は BarcodeDetector 非対応のためフォールバック用 -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
@@ -79,15 +81,36 @@
     }
 
     function detectQR() {
-      if (!('BarcodeDetector' in window)) {
-        statusEl.textContent = 'QR読取非対応のブラウザです。コードを手動入力してください。';
-        return;
-      }
-      const detector = new BarcodeDetector({ formats: ['qr_code'] });
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      const scan = async () => {
+      // BarcodeDetector 対応ブラウザ（Android Chrome 等）
+      if ('BarcodeDetector' in window) {
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        const scan = async () => {
+          if (!scanning || video.readyState < 2) {
+            requestAnimationFrame(scan);
+            return;
+          }
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          try {
+            const codes = await detector.detect(canvas);
+            if (codes.length > 0) {
+              scanning = false;
+              handleCode(codes[0].rawValue, true);
+              return;
+            }
+          } catch (e) {}
+          requestAnimationFrame(scan);
+        };
+        scan();
+        return;
+      }
+
+      // jsQR フォールバック（iOS Safari 等）
+      const scan = () => {
         if (!scanning || video.readyState < 2) {
           requestAnimationFrame(scan);
           return;
@@ -95,14 +118,13 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
-        try {
-          const codes = await detector.detect(canvas);
-          if (codes.length > 0) {
-            scanning = false;
-            handleCode(codes[0].rawValue, true);
-            return;
-          }
-        } catch (e) {}
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const qr = jsQR(imageData.data, canvas.width, canvas.height);
+        if (qr && qr.data) {
+          scanning = false;
+          handleCode(qr.data, true);
+          return;
+        }
         requestAnimationFrame(scan);
       };
       scan();
