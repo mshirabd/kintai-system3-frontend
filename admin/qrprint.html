@@ -91,7 +91,7 @@
       try {
         const emps = await api.getAllEmployees();
         const active = (emps || []).filter(e => e.status === '有効')
-          .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+          .sort((a, b) => (a.storeId || '').localeCompare(b.storeId || '') || (a.id || '').localeCompare(b.id || ''));
 
         if (active.length === 0) {
           el.innerHTML = '<div style="color:#999;">有効な従業員がいません</div>';
