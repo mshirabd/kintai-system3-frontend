@@ -80,6 +80,7 @@
     let scanTimer = null;
 
     function startScan() {
+      scanning = true;
       document.getElementById('start-btn').style.display = 'none';
       document.getElementById('video-container').style.display = 'block';
       statusEl.textContent = 'カメラを起動中...';
