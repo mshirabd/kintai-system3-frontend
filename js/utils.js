@@ -14,7 +14,7 @@ function minToHM(min) {
   if (!min || min <= 0) return '';
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return h + ':' + String(m).padStart(2, '0');
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
 
 /** 現在時刻を 'HH:mm:ss' で返す */
