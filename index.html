@@ -181,9 +181,27 @@
       }
       if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
       stopCamera();
-      // 検証は attendance.html 側で行うので直接遷移
-      location.href = `attendance.html?id=${encodeURIComponent(code)}`;
+      // 従業員マスタからキャッシュ済みの名前を渡して即時表示
+      const emp = window._empCache && window._empCache[code];
+      const q = new URLSearchParams({ id: code });
+      if (emp) {
+        q.set('name', emp.name);
+        q.set('store', emp.store);
+      }
+      location.href = `attendance.html?${q}`;
     }
+
+    // 従業員一覧をバックグラウンドでプリロード（名前の即時表示用）
+    (async () => {
+      try {
+        const emps = await api.getAllEmployees();
+        window._empCache = {};
+        (emps || []).forEach(e => {
+          window._empCache[e.id] = { name: e.name, store: e.storeName || '' };
+        });
+      } catch (e) {}
+    })();
+
   </script>
 </body>
 </html>

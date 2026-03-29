@@ -57,18 +57,31 @@
 
     let employeeInfo = null;
 
+    // URLパラメータから名前・店舗を即時表示
+    const preloadName  = params.get('name') || '';
+    const preloadStore = params.get('store') || '';
+    if (preloadName) {
+      document.getElementById('empName').textContent = preloadName;
+      document.getElementById('storeName').textContent = preloadStore;
+    }
+
     startClock('clock');
 
     async function init() {
       try {
-        const res = await api.getEmployeeInfo(employeeCode);
+        const res = await api.getEmployeeStatus(employeeCode);
         if (!res.success) {
           document.getElementById('empName').textContent = res.message || 'エラー';
           return;
         }
-        employeeInfo = res;
-        document.getElementById('empName').textContent = res.employeeName;
-        document.getElementById('storeName').textContent = res.storeName;
+        // 名前がまだ表示されていなければ getEmployeeInfo で取得
+        if (!preloadName) {
+          const info = await api.getEmployeeInfo(employeeCode);
+          if (info.success) {
+            document.getElementById('empName').textContent = info.employeeName;
+            document.getElementById('storeName').textContent = info.storeName;
+          }
+        }
         updateButtons(res.todayLogs || []);
       } catch (e) {
         document.getElementById('empName').textContent = '通信エラー';
