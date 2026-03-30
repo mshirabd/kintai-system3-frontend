@@ -148,4 +148,29 @@ const api = {
       alertId, date, clockOutTime, note, adminToken: auth.getToken(),
     });
   },
+
+  /** 打刻ログ検索 */
+  getPunchLogs(dateFrom, dateTo, empId) {
+    return callApi('getPunchLogs', { dateFrom, dateTo, empId, adminToken: auth.getToken() });
+  },
+
+  /** 打刻ログ更新 */
+  updatePunchLog(logId, logData) {
+    return callApi('updatePunchLog', { logId, logData, adminToken: auth.getToken() });
+  },
+
+  /** 打刻ログ削除 */
+  deletePunchLog(logId) {
+    return callApi('deletePunchLog', { logId, adminToken: auth.getToken() });
+  },
+
+  /** システム設定取得 */
+  getSystemSettings() {
+    return callApi('getSystemSettings', { adminToken: auth.getToken() });
+  },
+
+  /** システム設定更新 */
+  updateSystemSetting(key, value) {
+    return callApi('updateSystemSetting', { key, value, adminToken: auth.getToken() });
+  },
 };

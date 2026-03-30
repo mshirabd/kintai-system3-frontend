@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>打刻ログ編集 - 勤怠管理</title>
+  <link rel="stylesheet" href="../css/common.css">
+</head>
+<body>
+  <div id="nav-container"></div>
+  <div class="container">
+    <h1 style="font-size:20px;margin-bottom:16px;">打刻ログ編集</h1>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label>日付（から）</label>
+          <input type="date" id="dateFrom" class="form-control" style="width:160px;">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>日付（まで）</label>
+          <input type="date" id="dateTo" class="form-control" style="width:160px;">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>従業員</label>
+          <select id="empFilter" class="form-control" style="width:180px;">
+            <option value="">全員</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="search()">検索</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="logTable"><div class="loading">検索してください</div></div>
+    </div>
+  </div>
+
+  <!-- 編集モーダル -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3>打刻ログ編集</h3>
+      <div id="editInfo" style="margin-bottom:12px;font-size:14px;color:#666;"></div>
+      <form id="editForm">
+        <input type="hidden" id="editLogId">
+        <div class="form-group">
+          <label>打刻時刻</label>
+          <input type="time" id="editTime" class="form-control" step="1" required>
+        </div>
+        <div class="form-group">
+          <label>打刻種別</label>
+          <select id="editType" class="form-control" required>
+            <option value="出勤">出勤</option>
+            <option value="退勤">退勤</option>
+            <option value="休憩開始">休憩開始</option>
+            <option value="休憩終了">休憩終了</option>
+            <option value="賄い(昼)">まかない(昼)</option>
+            <option value="賄い(夜)">まかない(夜)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>備考</label>
+          <input type="text" id="editNote" class="form-control">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script>
+    if (!auth.requireAdmin()) throw '';
+    renderNav('log-edit');
+
+    let logs = [];
+
+    // 初期値: 今日
+    document.getElementById('dateFrom').value = todayStr();
+    document.getElementById('dateTo').value   = todayStr();
+
+    // 従業員ドロップダウン
+    (async () => {
+      try {
+        const emps = await api.getAllEmployees();
+        const sel = document.getElementById('empFilter');
+        (emps || []).forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = `${e.name} (${e.id})`;
+          sel.appendChild(opt);
+        });
+      } catch (e) {}
+    })();
+
+    async function search() {
+      const el = document.getElementById('logTable');
+      showLoading(el);
+      try {
+        logs = await api.getPunchLogs(
+          document.getElementById('dateFrom').value,
+          document.getElementById('dateTo').value,
+          document.getElementById('empFilter').value
+        );
+        render();
+      } catch (e) {
+        showError(el, e.message);
+      }
+    }
+
+    function render() {
+      const el = document.getElementById('logTable');
+      if (!logs || logs.length === 0) {
+        el.innerHTML = '<div style="color:#999;padding:12px;">該当する打刻ログがありません</div>';
+        return;
+      }
+      el.innerHTML = `<div style="overflow-x:auto;"><table>
+        <tr><th>日付</th><th>時刻</th><th>氏名</th><th>種別</th><th>店舗</th><th>打刻元</th><th>備考</th><th>操作</th></tr>
+        ${logs.map(l => `<tr>
+          <td style="white-space:nowrap;">${escHtml(l.date)}</td>
+          <td style="white-space:nowrap;">${escHtml(l.time.substring(0,5))}</td>
+          <td>${escHtml(l.empName)}</td>
+          <td>${escHtml(l.type)}</td>
+          <td>${escHtml(l.storeName)}</td>
+          <td style="font-size:12px;">${escHtml(l.source)}</td>
+          <td style="font-size:12px;">${escHtml(l.note)}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-sm btn-primary" onclick="openEdit('${escHtml(l.logId)}')">編集</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteLog('${escHtml(l.logId)}')">削除</button>
+          </td>
+        </tr>`).join('')}
+      </table></div>`;
+    }
+
+    function openEdit(logId) {
+      const l = logs.find(x => x.logId === logId);
+      if (!l) return;
+      document.getElementById('editLogId').value = logId;
+      document.getElementById('editInfo').textContent = `${l.empName} - ${l.date}`;
+      document.getElementById('editTime').value = l.time.substring(0, 5);
+      document.getElementById('editType').value = l.type;
+      document.getElementById('editNote').value = l.note;
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('open');
+    }
+
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const logId = document.getElementById('editLogId').value;
+      const logData = {
+        time: document.getElementById('editTime').value,
+        type: document.getElementById('editType').value,
+        note: document.getElementById('editNote').value,
+      };
+      try {
+        const res = await api.updatePunchLog(logId, logData);
+        if (res.success) { closeEditModal(); search(); }
+        else alert(res.message || 'エラー');
+      } catch (err) { alert('通信エラー: ' + err.message); }
+    });
+
+    async function deleteLog(logId) {
+      const l = logs.find(x => x.logId === logId);
+      if (!l) return;
+      if (!confirm(`この打刻ログを削除しますか？\n\n${l.empName} ${l.date} ${l.time.substring(0,5)} ${l.type}\n\n※削除すると元に戻せません`)) return;
+      try {
+        const res = await api.deletePunchLog(logId);
+        if (res.success) search();
+        else alert(res.message || 'エラー');
+      } catch (err) { alert('通信エラー: ' + err.message); }
+    }
+
+    search();
+  </script>
+</body>
+</html>
