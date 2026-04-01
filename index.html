@@ -191,19 +191,18 @@
 
     async function loadAttendanceStatus(code, preloadName) {
       try {
-        const res = await api.getEmployeeStatus(code);
-        if (res.success) {
-          updateButtons(res.todayLogs || []);
-        }
-        // 名前が未取得の場合、APIで取得してキャッシュに保存
-        if (!preloadName) {
-          const info = await api.getEmployeeInfo(code);
-          if (info.success) {
-            document.getElementById('empName').textContent = info.employeeName;
-            document.getElementById('storeName').textContent = info.storeName;
-            // localStorageに保存（次回から即時表示）
-            saveEmpCache(code, info.employeeName, info.storeName);
-          } else {
+        // getEmployeeInfo 1回で名前・店舗・打刻ログを全て取得
+        const info = await api.getEmployeeInfo(code);
+        if (info.success) {
+          // 名前・店舗を更新（キャッシュヒット時も最新化）
+          document.getElementById('empName').textContent = info.employeeName;
+          document.getElementById('storeName').textContent = info.storeName;
+          // ボタン状態を更新
+          updateButtons(info.todayLogs || []);
+          // キャッシュに保存（次回から即時表示）
+          saveEmpCache(code, info.employeeName, info.storeName);
+        } else {
+          if (!preloadName) {
             document.getElementById('empName').textContent = info.message || 'エラー';
           }
         }
