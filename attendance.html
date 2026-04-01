@@ -49,29 +49,6 @@
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script>
-    const params = new URLSearchParams(location.search);
-    const employeeCode = params.get('id') || '';
-    if (!employeeCode) {
-      location.href = 'index.html';
-    }
-
-    // URLパラメータから名前・店舗を即時表示（API不要）
-    const preloadName  = params.get('name') || '';
-    const preloadStore = params.get('store') || '';
-    document.getElementById('empName').textContent = preloadName || employeeCode;
-    document.getElementById('storeName').textContent = preloadStore;
-
-    startClock('clock');
-
-    // 15秒無操作でQRスキャンに戻る
-    let idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
-    function resetIdle() {
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
-    }
-    document.addEventListener('click', resetIdle);
-    document.addEventListener('touchstart', resetIdle);
-
     // ====================================================================
     // 従業員キャッシュ保存用
     // ====================================================================
@@ -86,6 +63,34 @@
         localStorage.setItem(EMP_CACHE_KEY, JSON.stringify(cache));
       } catch (e) {}
     }
+
+    const params = new URLSearchParams(location.search);
+    const employeeCode = params.get('id') || '';
+    if (!employeeCode) {
+      location.href = 'index.html';
+    }
+
+    // URLパラメータから名前・店舗を即時表示（API不要）
+    const preloadName  = params.get('name') || '';
+    const preloadStore = params.get('store') || '';
+    document.getElementById('empName').textContent = preloadName || employeeCode;
+    document.getElementById('storeName').textContent = preloadStore;
+
+    // 名前があれば即座にキャッシュ保存（API応答を待たない）
+    if (preloadName) {
+      saveEmpCache(employeeCode, preloadName, preloadStore);
+    }
+
+    startClock('clock');
+
+    // 15秒無操作でQRスキャンに戻る
+    let idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
+    function resetIdle() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
+    }
+    document.addEventListener('click', resetIdle);
+    document.addEventListener('touchstart', resetIdle);
 
     // ====================================================================
     // 打刻状態取得（getEmployeeInfo 1回で名前・ログ両方取得）
