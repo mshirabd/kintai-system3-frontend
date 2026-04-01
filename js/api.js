@@ -30,6 +30,11 @@ const api = {
     return callApi('processAttendance', params);
   },
 
+  /** 従業員名一覧取得（認証不要・軽量） */
+  getEmployeeNames() {
+    return callApi('getEmployeeNames', {});
+  },
+
   /** 従業員情報+当日ログ取得 */
   getEmployeeInfo(employeeCode) {
     return callApi('getEmployeeInfo', { employeeCode });

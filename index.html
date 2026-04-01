@@ -205,12 +205,25 @@
     // ====================================================================
     const EMP_CACHE_KEY = 'KINTAI_EMP_CACHE';
 
-    // localStorageから即時復元
+    // ① localStorageから即時復元
     try {
       const cached = localStorage.getItem(EMP_CACHE_KEY);
       if (cached) window._empCache = JSON.parse(cached);
     } catch (e) {}
     if (!window._empCache) window._empCache = {};
+
+    // ② バックグラウンドで全従業員名をプリロード（認証不要）
+    (async () => {
+      try {
+        const emps = await api.getEmployeeNames();
+        if (emps && emps.length > 0) {
+          emps.forEach(e => {
+            window._empCache[e.id] = { name: e.name, store: e.store };
+          });
+          localStorage.setItem(EMP_CACHE_KEY, JSON.stringify(window._empCache));
+        }
+      } catch (e) {}
+    })();
 
   </script>
 </body>
