@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR打刻スキャン</title>
+  <title>QR打刻</title>
   <link rel="stylesheet" href="css/common.css">
   <style>
     body { background: #1a1a2e; color: #fff; }
+
+    /* ── QRスキャン画面 ──────────────────────── */
     .scan-container { max-width: 480px; margin: 0 auto; padding: 16px; text-align: center; }
-    h1 { font-size: 20px; margin: 16px 0 8px; }
+    .scan-container h1 { font-size: 20px; margin: 16px 0 8px; }
     #start-btn {
       padding: 20px 40px;
       font-size: 18px;
@@ -51,20 +53,67 @@
       background: #2a2a3e;
       color: #fff;
     }
+
+    /* ── 打刻画面 ────────────────────────────── */
+    #attendance-view { display: none; }
+    #attendance-view body { background: #f5f5f5; }
+    .attendance-header { text-align: center; padding: 16px 0; }
+    .emp-name { font-size: 22px; font-weight: bold; color: #333; }
+    .store-name { font-size: 14px; color: #666; }
+    #result {
+      text-align: center;
+      padding: 16px;
+      margin: 12px 0;
+      border-radius: 8px;
+      font-size: 16px;
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <div class="scan-container">
-    <h1>QR打刻スキャン</h1>
-    <button id="start-btn" onclick="startScan()">QRコード読取り</button>
-    <div id="video-container">
-      <video id="video" autoplay playsinline></video>
-      <div id="scan-guide"></div>
+
+  <!-- ===== QRスキャン画面 ===== -->
+  <div id="scan-view">
+    <div class="scan-container">
+      <h1>QR打刻スキャン</h1>
+      <button id="start-btn" onclick="startScan()">QRコード読取り</button>
+      <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+        <div id="scan-guide"></div>
+      </div>
+      <div id="status"></div>
+      <div id="manual-input">
+        <input type="text" id="codeInput" placeholder="従業員コードを入力">
+        <button class="btn btn-primary" onclick="handleCode(document.getElementById('codeInput').value)">確認</button>
+      </div>
     </div>
-    <div id="status"></div>
-    <div id="manual-input">
-      <input type="text" id="codeInput" placeholder="従業員コードを入力">
-      <button class="btn btn-primary" onclick="handleCode(document.getElementById('codeInput').value)">確認</button>
+  </div>
+
+  <!-- ===== 打刻画面 ===== -->
+  <div id="attendance-view">
+    <div class="container-narrow">
+      <div class="card">
+        <div class="attendance-header">
+          <div class="clock" id="clock"></div>
+          <div class="emp-name" id="empName"></div>
+          <div class="store-name" id="storeName"></div>
+        </div>
+
+        <div class="punch-buttons" id="punchButtons">
+          <button class="punch-btn clock-in" data-type="出勤">出勤</button>
+          <button class="punch-btn clock-out" data-type="退勤">退勤</button>
+          <button class="punch-btn break-start" data-type="休憩開始">休憩開始</button>
+          <button class="punch-btn break-end" data-type="休憩終了">休憩終了</button>
+          <button class="punch-btn meal" data-type="賄い(昼)">まかない(昼)</button>
+          <button class="punch-btn meal" data-type="賄い(夜)">まかない(夜)</button>
+        </div>
+
+        <div id="result"></div>
+
+        <div style="text-align:center;margin-top:20px;">
+          <a href="#" onclick="showScanView();return false;" style="color:#1A73E8;font-size:14px;text-decoration:none;">← QRスキャンに戻る</a>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -74,9 +123,138 @@
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script>
+    // ====================================================================
+    // 画面切り替え
+    // ====================================================================
+    let currentEmployeeCode = '';
+    let idleTimer = null;
+
+    function showScanView() {
+      clearIdleTimer();
+      currentEmployeeCode = '';
+      document.getElementById('scan-view').style.display = '';
+      document.getElementById('attendance-view').style.display = 'none';
+      document.body.style.background = '#1a1a2e';
+      // スキャン画面の状態をリセット
+      document.getElementById('start-btn').style.display = '';
+      document.getElementById('video-container').style.display = 'none';
+      document.getElementById('status').textContent = '';
+      document.getElementById('codeInput').value = '';
+      scanning = false;
+      stopCamera();
+    }
+
+    function showAttendanceView(code, name, store) {
+      currentEmployeeCode = code;
+      document.getElementById('scan-view').style.display = 'none';
+      document.getElementById('attendance-view').style.display = '';
+      document.body.style.background = '#f5f5f5';
+
+      // 名前・店舗を即時表示
+      document.getElementById('empName').textContent = name || code;
+      document.getElementById('storeName').textContent = store || '';
+
+      // ボタンをリセット
+      document.querySelectorAll('.punch-btn').forEach(b => b.disabled = false);
+      const resultEl = document.getElementById('result');
+      resultEl.style.display = 'none';
+      resultEl.textContent = '';
+
+      // 時計を開始
+      startClock('clock');
+
+      // 15秒無操作でQRスキャンに戻る
+      startIdleTimer();
+
+      // バックグラウンドで打刻状態を取得してボタンを制御
+      loadAttendanceStatus(code, name);
+    }
+
+    function startIdleTimer() {
+      clearIdleTimer();
+      idleTimer = setTimeout(showScanView, 15000);
+    }
+
+    function clearIdleTimer() {
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    }
+
+    // タッチ/クリックでアイドルタイマーリセット
+    document.addEventListener('click', () => { if (currentEmployeeCode) startIdleTimer(); });
+    document.addEventListener('touchstart', () => { if (currentEmployeeCode) startIdleTimer(); });
+
+    // ====================================================================
+    // 打刻画面ロジック
+    // ====================================================================
+
+    async function loadAttendanceStatus(code, preloadName) {
+      try {
+        const res = await api.getEmployeeStatus(code);
+        if (res.success) {
+          updateButtons(res.todayLogs || []);
+        }
+        // 名前が未取得の場合のみ補完
+        if (!preloadName) {
+          const info = await api.getEmployeeInfo(code);
+          if (info.success) {
+            document.getElementById('empName').textContent = info.employeeName;
+            document.getElementById('storeName').textContent = info.storeName;
+          } else {
+            document.getElementById('empName').textContent = info.message || 'エラー';
+          }
+        }
+      } catch (e) {}
+    }
+
+    function updateButtons(logs) {
+      const types = logs.map(l => l.type);
+      document.querySelectorAll('.punch-btn').forEach(btn => {
+        if (types.includes(btn.dataset.type)) btn.disabled = true;
+      });
+    }
+
+    // 打刻ボタンクリック
+    document.getElementById('punchButtons').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.punch-btn');
+      if (!btn || btn.disabled) return;
+
+      const type = btn.dataset.type;
+      btn.disabled = true;
+
+      const resultEl = document.getElementById('result');
+      resultEl.style.display = 'block';
+      resultEl.className = '';
+      resultEl.textContent = '送信中...';
+
+      try {
+        const res = await api.processAttendance({
+          employeeId: currentEmployeeCode,
+          attendanceType: type,
+        });
+        if (res.success) {
+          resultEl.className = 'success-message';
+          resultEl.textContent = '打刻しました';
+          document.querySelectorAll('.punch-btn').forEach(b => b.disabled = true);
+          clearIdleTimer();
+          setTimeout(showScanView, 3000);
+        } else {
+          resultEl.className = 'error-message';
+          resultEl.textContent = res.message;
+          btn.disabled = false;
+        }
+      } catch (e) {
+        resultEl.className = 'error-message';
+        resultEl.textContent = '通信エラー: ' + e.message;
+        btn.disabled = false;
+      }
+    });
+
+    // ====================================================================
+    // QRスキャンロジック
+    // ====================================================================
     const video = document.getElementById('video');
     const statusEl = document.getElementById('status');
-    let scanning = true;
+    let scanning = false;
     let scanTimer = null;
 
     function startScan() {
@@ -84,7 +262,6 @@
       document.getElementById('start-btn').style.display = 'none';
       document.getElementById('video-container').style.display = 'block';
       statusEl.textContent = 'カメラを起動中...';
-      // 20秒後にタイムアウトで初期画面に戻る
       scanTimer = setTimeout(() => {
         scanning = false;
         stopCamera();
@@ -121,7 +298,6 @@
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      // BarcodeDetector 対応ブラウザ（Android Chrome 等）
       if ('BarcodeDetector' in window) {
         const detector = new BarcodeDetector({ formats: ['qr_code'] });
         const scan = async () => {
@@ -167,31 +343,22 @@
       scan();
     }
 
-    /**
-     * QRコード or 手動入力から従業員コードを処理する。
-     * @param {string} raw - 読み取った文字列
-     * @param {boolean} [fromQR=false] - QRコード経由の場合 true
-     */
     function handleCode(raw, fromQR) {
       let code = (raw || '').trim();
       if (!code) return;
-      // QR読み取りの場合、末尾の複製防止文字列（5文字）を除去
       if (fromQR && code.length > 5) {
         code = code.slice(0, -5);
       }
       if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
       stopCamera();
-      // 従業員マスタからキャッシュ済みの名前を渡して即時表示
+
       const emp = window._empCache && window._empCache[code];
-      const q = new URLSearchParams({ id: code });
-      if (emp) {
-        q.set('name', emp.name);
-        q.set('store', emp.store);
-      }
-      location.href = `attendance.html?${q}`;
+      showAttendanceView(code, emp ? emp.name : '', emp ? emp.store : '');
     }
 
-    // 従業員一覧をlocalStorageキャッシュ + バックグラウンド更新で即時利用可能にする
+    // ====================================================================
+    // 従業員キャッシュ（localStorage + バックグラウンド更新）
+    // ====================================================================
     const EMP_CACHE_KEY = 'KINTAI_EMP_CACHE';
 
     // ① localStorageから即時復元
@@ -214,6 +381,20 @@
       } catch (e) {}
     })();
 
+    // ====================================================================
+    // URLパラメータからの打刻画面直接表示（attendance.htmlからのリダイレクト対応）
+    // ====================================================================
+    (function() {
+      const p = new URLSearchParams(location.search);
+      const id = p.get('id');
+      if (id) {
+        const name  = p.get('name') || (window._empCache[id] && window._empCache[id].name) || '';
+        const store = p.get('store') || (window._empCache[id] && window._empCache[id].store) || '';
+        // URLパラメータをクリーンアップ
+        history.replaceState(null, '', location.pathname);
+        showAttendanceView(id, name, store);
+      }
+    })();
   </script>
 </body>
 </html>
