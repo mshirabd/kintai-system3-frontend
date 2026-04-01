@@ -191,14 +191,26 @@
       location.href = `attendance.html?${q}`;
     }
 
-    // 従業員一覧をバックグラウンドでプリロード（名前の即時表示用）
+    // 従業員一覧をlocalStorageキャッシュ + バックグラウンド更新で即時利用可能にする
+    const EMP_CACHE_KEY = 'KINTAI_EMP_CACHE';
+
+    // ① localStorageから即時復元
+    try {
+      const cached = localStorage.getItem(EMP_CACHE_KEY);
+      if (cached) window._empCache = JSON.parse(cached);
+    } catch (e) {}
+    if (!window._empCache) window._empCache = {};
+
+    // ② バックグラウンドでAPIから最新データを取得し、キャッシュを更新
     (async () => {
       try {
         const emps = await api.getAllEmployees();
-        window._empCache = {};
+        const fresh = {};
         (emps || []).forEach(e => {
-          window._empCache[e.id] = { name: e.name, store: e.storeName || '' };
+          fresh[e.id] = { name: e.name, store: e.storeName || '' };
         });
+        window._empCache = fresh;
+        localStorage.setItem(EMP_CACHE_KEY, JSON.stringify(fresh));
       } catch (e) {}
     })();
 
