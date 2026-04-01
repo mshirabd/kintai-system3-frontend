@@ -195,12 +195,14 @@
         if (res.success) {
           updateButtons(res.todayLogs || []);
         }
-        // 名前が未取得の場合のみ補完
+        // 名前が未取得の場合、APIで取得してキャッシュに保存
         if (!preloadName) {
           const info = await api.getEmployeeInfo(code);
           if (info.success) {
             document.getElementById('empName').textContent = info.employeeName;
             document.getElementById('storeName').textContent = info.storeName;
+            // localStorageに保存（次回から即時表示）
+            saveEmpCache(code, info.employeeName, info.storeName);
           } else {
             document.getElementById('empName').textContent = info.message || 'エラー';
           }
@@ -359,29 +361,24 @@
     }
 
     // ====================================================================
-    // 従業員キャッシュ（localStorage + バックグラウンド更新）
+    // 従業員キャッシュ（localStorage蓄積型・認証不要）
     // ====================================================================
     const EMP_CACHE_KEY = 'KINTAI_EMP_CACHE';
 
-    // ① localStorageから即時復元
+    // localStorageから即時復元
     try {
       const cached = localStorage.getItem(EMP_CACHE_KEY);
       if (cached) window._empCache = JSON.parse(cached);
     } catch (e) {}
     if (!window._empCache) window._empCache = {};
 
-    // ② バックグラウンドでAPIから最新データを取得し、キャッシュを更新
-    (async () => {
+    // 個別にキャッシュを保存（打刻のたびに蓄積される）
+    function saveEmpCache(code, name, store) {
+      window._empCache[code] = { name: name, store: store || '' };
       try {
-        const emps = await api.getAllEmployees();
-        const fresh = {};
-        (emps || []).forEach(e => {
-          fresh[e.id] = { name: e.name, store: e.storeName || '' };
-        });
-        window._empCache = fresh;
-        localStorage.setItem(EMP_CACHE_KEY, JSON.stringify(fresh));
+        localStorage.setItem(EMP_CACHE_KEY, JSON.stringify(window._empCache));
       } catch (e) {}
-    })();
+    }
 
     // ====================================================================
     // URLパラメータからの打刻画面直接表示（attendance.htmlからのリダイレクト対応）
