@@ -60,7 +60,7 @@
     <div id="video-container">
       <video id="video" autoplay playsinline></video>
       <div id="scan-guide"></div>
-      <button id="switch-cam-btn" onclick="switchCamera()" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;">カメラ切替</button>
+      <button id="switch-cam-btn" onclick="switchCamera()" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;">背面カメラ</button>
     </div>
     <div id="status"></div>
     <div id="manual-input">
@@ -121,6 +121,7 @@
 
     function switchCamera() {
       useFrontCamera = !useFrontCamera;
+      document.getElementById('switch-cam-btn').textContent = useFrontCamera ? '前面カメラ' : '背面カメラ';
       stopCamera();
       startCamera();
     }
