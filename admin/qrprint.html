@@ -36,7 +36,21 @@
     .qr-card canvas { flex-shrink: 0; }
     .qr-info { text-align: left; min-width: 0; }
     .qr-name { font-weight: bold; font-size: 14px; line-height: 1.3; }
+    .qr-name-line { font-size: 13px; color: #999; border-bottom: 1px solid #ccc; min-width: 100px; height: 20px; }
     .qr-id { font-size: 11px; color: #666; }
+
+    /* ── タブ ─────────────────────────────── */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 16px; }
+    .tab-btn {
+      padding: 8px 20px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .tab-btn:first-child { border-radius: 6px 0 0 6px; }
+    .tab-btn:last-child { border-radius: 0 6px 6px 0; }
+    .tab-btn.active { background: #1A73E8; color: #fff; border-color: #1A73E8; }
 
     /* ── 印刷用 ───────────────────────────── */
     @media print {
@@ -72,7 +86,51 @@
       <h1 style="font-size:20px;">QRコード印刷</h1>
       <button class="btn btn-primary" onclick="window.print()">印刷</button>
     </div>
-    <div id="qrArea"><div class="loading">読み込み中...</div></div>
+
+    <!-- タブ切替 -->
+    <div class="no-print tab-bar">
+      <button class="tab-btn active" onclick="switchTab('registered')">登録済み従業員</button>
+      <button class="tab-btn" onclick="switchTab('preprint')">事前印刷</button>
+    </div>
+
+    <!-- 登録済み従業員フィルタ -->
+    <div id="filter-registered" class="no-print card" style="margin-bottom:16px;">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label>店舗</label>
+          <select id="storeFilter" class="form-control" style="width:200px;">
+            <option value="">全店舗</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>従業員コード（From）</label>
+          <input type="text" id="codeFrom" class="form-control" style="width:120px;" placeholder="例: EMP001">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>従業員コード（To）</label>
+          <input type="text" id="codeTo" class="form-control" style="width:120px;" placeholder="例: EMP010">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadRegistered()">表示</button>
+      </div>
+    </div>
+
+    <!-- 事前印刷フィルタ -->
+    <div id="filter-preprint" class="no-print card" style="margin-bottom:16px;display:none;">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label>従業員コード（From）</label>
+          <input type="text" id="preFrom" class="form-control" style="width:120px;">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>従業員コード（To）</label>
+          <input type="text" id="preTo" class="form-control" style="width:120px;">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadPreprint()">表示</button>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:#888;" id="preprintHint"></div>
+    </div>
+
+    <div id="qrArea"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
@@ -84,57 +142,177 @@
     if (!auth.requireAdmin()) throw '';
     renderNav('qrprint');
 
-    async function load() {
-      const el = document.getElementById('qrArea');
+    let allEmployees = [];
+    let currentTab = 'registered';
+
+    // ====================================================================
+    // 初期化
+    // ====================================================================
+    async function init() {
       try {
-        const emps = await api.getAllEmployees();
-        const active = (emps || []).filter(e => e.status === '有効')
-          .sort((a, b) => (a.storeId || '').localeCompare(b.storeId || '') || (a.id || '').localeCompare(b.id || ''));
+        allEmployees = await api.getAllEmployees() || [];
 
-        if (active.length === 0) {
-          el.innerHTML = '<div style="color:#999;">有効な従業員がいません</div>';
-          return;
-        }
-
-        // 10件ずつページに分割
-        const pages = [];
-        for (let i = 0; i < active.length; i += 10) {
-          pages.push(active.slice(i, i + 10));
-        }
-
-        el.innerHTML = pages.map(page => {
-          const cards = page.map(e => `
-            <div class="qr-card">
-              <canvas id="qr-${e.id}"></canvas>
-              <div class="qr-info">
-                <div class="qr-name">${escHtml(e.name)}</div>
-                <div class="qr-id">${escHtml(e.id)}</div>
-              </div>
-            </div>
-          `).join('');
-          // 空セルで10面を埋める
-          const empty = Array(10 - page.length).fill('<div class="qr-card"></div>').join('');
-          return `<div class="qr-page">${cards}${empty}</div>`;
-        }).join('');
-
-        // QRコード生成（従業員コード + ランダム5文字で複製防止）
-        active.forEach(e => {
-          const suffix = Array.from({length: 5}, () =>
-            'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-              [Math.random() * 54 | 0]
-          ).join('');
-          QRCode.toCanvas(document.getElementById('qr-' + e.id), e.id + suffix, {
-            width: 120,
-            margin: 1,
-            errorCorrectionLevel: 'M',
-          });
+        // 店舗フィルタ
+        const stores = await api.getStores();
+        const sel = document.getElementById('storeFilter');
+        (stores || []).forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.name;
+          sel.appendChild(opt);
         });
-      } catch (e) {
-        showError(el, e.message);
-      }
+
+        // 事前印刷の初期値（次の採番）
+        const nextId = getNextEmpId();
+        document.getElementById('preFrom').value = nextId;
+        document.getElementById('preTo').value = formatEmpId(parseEmpNum(nextId) + 9);
+        document.getElementById('preprintHint').textContent =
+          `現在の最大従業員コード: ${allEmployees.length > 0 ? getMaxEmpId() : 'なし'}　→　次の採番: ${nextId}`;
+
+      } catch (e) {}
     }
 
-    load();
+    // ====================================================================
+    // タブ切替
+    // ====================================================================
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', (i === 0 && tab === 'registered') || (i === 1 && tab === 'preprint'));
+      });
+      document.getElementById('filter-registered').style.display = tab === 'registered' ? '' : 'none';
+      document.getElementById('filter-preprint').style.display = tab === 'preprint' ? '' : 'none';
+      document.getElementById('qrArea').innerHTML = '';
+    }
+
+    // ====================================================================
+    // 登録済み従業員の印刷
+    // ====================================================================
+    function loadRegistered() {
+      const storeId  = document.getElementById('storeFilter').value;
+      const codeFrom = document.getElementById('codeFrom').value.trim().toUpperCase();
+      const codeTo   = document.getElementById('codeTo').value.trim().toUpperCase();
+
+      let filtered = allEmployees.filter(e => e.status === '有効');
+
+      if (storeId) {
+        filtered = filtered.filter(e => e.storeId === storeId);
+      }
+      if (codeFrom) {
+        filtered = filtered.filter(e => e.id >= codeFrom);
+      }
+      if (codeTo) {
+        filtered = filtered.filter(e => e.id <= codeTo);
+      }
+
+      filtered.sort((a, b) => (a.storeId || '').localeCompare(b.storeId || '') || (a.id || '').localeCompare(b.id || ''));
+
+      renderCards(filtered.map(e => ({ id: e.id, name: e.name })));
+    }
+
+    // ====================================================================
+    // 事前印刷（未登録コード）
+    // ====================================================================
+    function loadPreprint() {
+      const fromStr = document.getElementById('preFrom').value.trim().toUpperCase();
+      const toStr   = document.getElementById('preTo').value.trim().toUpperCase();
+
+      const fromNum = parseEmpNum(fromStr);
+      const toNum   = parseEmpNum(toStr);
+
+      if (!fromNum || !toNum || fromNum > toNum) {
+        alert('従業員コードの範囲が不正です。');
+        return;
+      }
+      if (toNum - fromNum + 1 > 100) {
+        alert('一度に印刷できるのは100件までです。');
+        return;
+      }
+
+      const cards = [];
+      for (let i = fromNum; i <= toNum; i++) {
+        cards.push({ id: formatEmpId(i), name: '' });
+      }
+      renderCards(cards);
+    }
+
+    // ====================================================================
+    // QRカード描画（共通）
+    // ====================================================================
+    function renderCards(cards) {
+      const el = document.getElementById('qrArea');
+      if (cards.length === 0) {
+        el.innerHTML = '<div style="color:#999;padding:12px;">該当する従業員がいません</div>';
+        return;
+      }
+
+      const pages = [];
+      for (let i = 0; i < cards.length; i += 10) {
+        pages.push(cards.slice(i, i + 10));
+      }
+
+      el.innerHTML = pages.map(page => {
+        const html = page.map(c => `
+          <div class="qr-card">
+            <canvas id="qr-${c.id}"></canvas>
+            <div class="qr-info">
+              ${c.name
+                ? `<div class="qr-name">${escHtml(c.name)}</div>`
+                : '<div class="qr-name-line"></div>'
+              }
+              <div class="qr-id">${escHtml(c.id)}</div>
+            </div>
+          </div>
+        `).join('');
+        const empty = Array(10 - page.length).fill('<div class="qr-card"></div>').join('');
+        return `<div class="qr-page">${html}${empty}</div>`;
+      }).join('');
+
+      // QRコード生成
+      cards.forEach(c => {
+        const suffix = Array.from({length: 5}, () =>
+          'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+            [Math.random() * 54 | 0]
+        ).join('');
+        QRCode.toCanvas(document.getElementById('qr-' + c.id), c.id + suffix, {
+          width: 120,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+        });
+      });
+    }
+
+    // ====================================================================
+    // 従業員コード ユーティリティ
+    // ====================================================================
+    function parseEmpNum(code) {
+      const m = (code || '').match(/^EMP(\d+)$/i);
+      return m ? parseInt(m[1], 10) : 0;
+    }
+
+    function formatEmpId(num) {
+      return 'EMP' + String(num).padStart(3, '0');
+    }
+
+    function getMaxEmpId() {
+      let max = 0;
+      allEmployees.forEach(e => {
+        const n = parseEmpNum(e.id);
+        if (n > max) max = n;
+      });
+      return max > 0 ? formatEmpId(max) : '';
+    }
+
+    function getNextEmpId() {
+      let max = 0;
+      allEmployees.forEach(e => {
+        const n = parseEmpNum(e.id);
+        if (n > max) max = n;
+      });
+      return formatEmpId(max + 1);
+    }
+
+    init();
   </script>
 </body>
 </html>
