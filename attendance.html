@@ -4,11 +4,157 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>出退勤打刻</title>
-  <script>
-    // index.htmlに統合済み。URLパラメータを引き継いでリダイレクト
-    var params = location.search || '';
-    location.replace('index.html' + params);
-  </script>
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    .attendance-header { text-align: center; padding: 16px 0; }
+    .emp-name { font-size: 22px; font-weight: bold; }
+    .store-name { font-size: 14px; color: #666; }
+    #result {
+      text-align: center;
+      padding: 16px;
+      margin: 12px 0;
+      border-radius: 8px;
+      font-size: 16px;
+      display: none;
+    }
+  </style>
 </head>
-<body></body>
+<body>
+  <div class="container-narrow">
+    <div class="card">
+      <div class="attendance-header">
+        <div class="clock" id="clock"></div>
+        <div class="emp-name" id="empName"></div>
+        <div class="store-name" id="storeName"></div>
+      </div>
+
+      <div class="punch-buttons" id="punchButtons">
+        <button class="punch-btn clock-in" data-type="出勤">出勤</button>
+        <button class="punch-btn clock-out" data-type="退勤">退勤</button>
+        <button class="punch-btn break-start" data-type="休憩開始">休憩開始</button>
+        <button class="punch-btn break-end" data-type="休憩終了">休憩終了</button>
+        <button class="punch-btn meal" data-type="賄い(昼)">まかない(昼)</button>
+        <button class="punch-btn meal" data-type="賄い(夜)">まかない(夜)</button>
+      </div>
+
+      <div id="result"></div>
+
+      <div style="text-align:center;margin-top:20px;">
+        <a href="index.html" style="color:#1A73E8;font-size:14px;text-decoration:none;">← QRスキャンに戻る</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const employeeCode = params.get('id') || '';
+    if (!employeeCode) {
+      location.href = 'index.html';
+    }
+
+    // URLパラメータから名前・店舗を即時表示（API不要）
+    const preloadName  = params.get('name') || '';
+    const preloadStore = params.get('store') || '';
+    document.getElementById('empName').textContent = preloadName || employeeCode;
+    document.getElementById('storeName').textContent = preloadStore;
+
+    startClock('clock');
+
+    // 15秒無操作でQRスキャンに戻る
+    let idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
+    function resetIdle() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { location.href = 'index.html'; }, 15000);
+    }
+    document.addEventListener('click', resetIdle);
+    document.addEventListener('touchstart', resetIdle);
+
+    // ====================================================================
+    // 従業員キャッシュ保存用
+    // ====================================================================
+    const EMP_CACHE_KEY = 'KINTAI_EMP_CACHE';
+
+    function saveEmpCache(code, name, store) {
+      try {
+        let cache = {};
+        const cached = localStorage.getItem(EMP_CACHE_KEY);
+        if (cached) cache = JSON.parse(cached);
+        cache[code] = { name: name, store: store || '' };
+        localStorage.setItem(EMP_CACHE_KEY, JSON.stringify(cache));
+      } catch (e) {}
+    }
+
+    // ====================================================================
+    // 打刻状態取得（getEmployeeInfo 1回で名前・ログ両方取得）
+    // ====================================================================
+    async function init() {
+      try {
+        const info = await api.getEmployeeInfo(employeeCode);
+        if (info.success) {
+          document.getElementById('empName').textContent = info.employeeName;
+          document.getElementById('storeName').textContent = info.storeName;
+          updateButtons(info.todayLogs || []);
+          // キャッシュに保存（次回から即時表示）
+          saveEmpCache(employeeCode, info.employeeName, info.storeName);
+        } else {
+          if (!preloadName) {
+            document.getElementById('empName').textContent = info.message || 'エラー';
+          }
+        }
+      } catch (e) {}
+    }
+
+    function updateButtons(logs) {
+      const types = logs.map(l => l.type);
+      const buttons = document.querySelectorAll('.punch-btn');
+      buttons.forEach(btn => {
+        if (types.includes(btn.dataset.type)) {
+          btn.disabled = true;
+        }
+      });
+    }
+
+    // 打刻ボタンクリック
+    document.getElementById('punchButtons').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.punch-btn');
+      if (!btn || btn.disabled) return;
+
+      const type = btn.dataset.type;
+      btn.disabled = true;
+
+      const resultEl = document.getElementById('result');
+      resultEl.style.display = 'block';
+      resultEl.className = '';
+      resultEl.textContent = '送信中...';
+
+      try {
+        const res = await api.processAttendance({
+          employeeId: employeeCode,
+          attendanceType: type,
+        });
+        if (res.success) {
+          resultEl.className = 'success-message';
+          resultEl.textContent = '打刻しました';
+          // 全ボタン無効化
+          document.querySelectorAll('.punch-btn').forEach(b => b.disabled = true);
+          // 3秒後にQRスキャン画面に戻る
+          setTimeout(() => { location.href = 'index.html'; }, 3000);
+        } else {
+          resultEl.className = 'error-message';
+          resultEl.textContent = res.message;
+          btn.disabled = false;
+        }
+      } catch (e) {
+        resultEl.className = 'error-message';
+        resultEl.textContent = '通信エラー: ' + e.message;
+        btn.disabled = false;
+      }
+    });
+
+    init();
+  </script>
+</body>
 </html>
