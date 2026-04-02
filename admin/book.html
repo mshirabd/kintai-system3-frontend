@@ -64,7 +64,7 @@
         if (!data || !data.days) { el.innerHTML = '<div style="color:#999;">データがありません</div>'; return; }
         const dowCls = d => d === '日' ? 'sun' : d === '土' ? 'sat' : '';
         el.innerHTML = `
-          <div style="margin-bottom:8px;font-weight:bold;">${escHtml(data.empName)}（${escHtml(data.employmentType||'')}） - ${escHtml(data.storeName||'')}</div>
+          <div style="margin-bottom:8px;font-weight:bold;">${escHtml(data.empName)}（${escHtml(data.paymentType||'')}） - ${escHtml(data.storeName||'')}</div>
           <div style="overflow-x:auto;">
           <table class="book-table">
             <tr><th>日</th><th>曜</th><th>出勤</th><th>退勤</th><th>休憩</th><th>実労働</th><th>時間外</th><th>まかない</th><th>備考</th></tr>

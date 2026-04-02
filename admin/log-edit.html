@@ -120,7 +120,7 @@
         return;
       }
       el.innerHTML = `<div style="overflow-x:auto;"><table>
-        <tr><th>日付</th><th>時刻</th><th>氏名</th><th>種別</th><th>店舗</th><th>打刻元</th><th>備考</th><th>操作</th></tr>
+        <tr><th>日付</th><th>時刻</th><th>氏名</th><th>種別</th><th>所属</th><th>打刻元</th><th>備考</th><th>操作</th></tr>
         ${logs.map(l => `<tr>
           <td style="white-space:nowrap;">${escHtml(l.date)}</td>
           <td style="white-space:nowrap;">${escHtml(l.time.substring(0,5))}</td>

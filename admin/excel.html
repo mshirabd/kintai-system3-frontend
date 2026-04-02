@@ -14,7 +14,7 @@
       <p style="font-size:14px;color:#666;margin-bottom:16px;">
         時間補正付きExcelファイルを生成してダウンロードします。<br>
         出勤10:00以前→10:00、退勤22:00以降→22:00に補正。<br>
-        正社員は法定休憩を自動差引、8時間超を残業として計算します。
+        月給制は法定休憩を自動差引、8時間超を残業として計算します。
       </p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <div class="form-group" style="margin:0;">
@@ -22,9 +22,9 @@
           <input type="month" id="excelYM" class="form-control" style="width:180px;">
         </div>
         <div class="form-group" style="margin:0;">
-          <label>店舗</label>
+          <label>所属</label>
           <select id="excelStore" class="form-control" style="width:200px;">
-            <option value="">全店舗</option>
+            <option value="">全所属</option>
           </select>
         </div>
         <div style="padding-top:20px;">

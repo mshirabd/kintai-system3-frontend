@@ -13,7 +13,7 @@
 
     <div style="margin-bottom:16px;">
       <select id="storeFilter" class="form-control" style="max-width:240px;">
-        <option value="">全店舗</option>
+        <option value="">全所属</option>
       </select>
     </div>
 
@@ -78,7 +78,7 @@
       }
     }
 
-    // 店舗フィルタ
+    // 所属フィルタ
     async function loadStores() {
       try {
         const stores = await api.getStores();

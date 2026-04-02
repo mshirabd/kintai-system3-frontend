@@ -37,16 +37,14 @@
           <input type="email" id="fEmail" class="form-control">
         </div>
         <div class="form-group">
-          <label>雇用形態</label>
+          <label>支給形態</label>
           <select id="fType" class="form-control">
-            <option value="正社員">正社員</option>
-            <option value="パート">パート</option>
-            <option value="アルバイト">アルバイト</option>
-            <option value="契約社員">契約社員</option>
+            <option value="月給制">月給制</option>
+            <option value="時間給制">時間給制</option>
           </select>
         </div>
         <div class="form-group">
-          <label>店舗</label>
+          <label>所属</label>
           <select id="fStore" class="form-control"></select>
         </div>
         <div class="form-group">
@@ -92,11 +90,11 @@
         return;
       }
       el.innerHTML = `<table>
-        <tr><th>ID</th><th>氏名</th><th>雇用形態</th><th>店舗</th><th>状態</th><th>操作</th></tr>
+        <tr><th>ID</th><th>氏名</th><th>支給形態</th><th>所属</th><th>状態</th><th>操作</th></tr>
         ${employees.map(e => `<tr>
           <td>${escHtml(e.id)}</td>
           <td>${escHtml(e.name)}</td>
-          <td>${escHtml(e.employmentType)}</td>
+          <td>${escHtml(e.paymentType)}</td>
           <td>${escHtml(e.storeName)}</td>
           <td><span class="status-badge ${e.status==='有効'?'status-active':'status-inactive'}">${escHtml(e.status)}</span></td>
           <td>
@@ -116,7 +114,7 @@
       document.getElementById('fId').value = '';
       document.getElementById('fName').value = '';
       document.getElementById('fEmail').value = '';
-      document.getElementById('fType').value = '正社員';
+      document.getElementById('fType').value = '月給制';
       document.getElementById('fStore').value = '';
       document.getElementById('fHireDate').value = '';
       document.getElementById('empModal').classList.add('open');
@@ -131,7 +129,7 @@
       document.getElementById('fId').value = id;
       document.getElementById('fName').value = emp.name;
       document.getElementById('fEmail').value = emp.email;
-      document.getElementById('fType').value = emp.employmentType;
+      document.getElementById('fType').value = emp.paymentType;
       document.getElementById('fStore').value = emp.storeId;
       document.getElementById('fHireDate').value = emp.hireDate;
       document.getElementById('empModal').classList.add('open');
@@ -148,7 +146,7 @@
         id: document.getElementById('fId').value.trim(),
         name: document.getElementById('fName').value.trim(),
         email: document.getElementById('fEmail').value.trim(),
-        employmentType: document.getElementById('fType').value,
+        paymentType: document.getElementById('fType').value,
         storeId: document.getElementById('fStore').value,
         hireDate: document.getElementById('fHireDate').value,
       };

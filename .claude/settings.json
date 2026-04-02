@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull:*)",
+      "Bash(pandoc --version)",
+      "Bash(git status:*)",
+      "Bash(grep -n \"^---$\" オペレーションマニュアル.md)"
+    ],
+    "additionalDirectories": [
+      "/Users/m-shirakawa/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian Vault/Journal"
+    ]
+  }
+}
